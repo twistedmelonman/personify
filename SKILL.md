@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 0.5.2
+version: 0.5.3
 description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards and PR comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -42,7 +42,7 @@ Watch for: "stands as a testament to," "marks a pivotal moment," "underscores it
 
 ### B. Empty vocabulary cluster
 
-Words that spike hard in LLM output relative to human baseline: delve, intricate, tapestry, foster, garner, underscore (verb), leverage, holistic, navigate (figurative), robust, landscape (abstract), shape (abstract, for a process or idea rather than a physical object), load-bearing (figurative, for anything other than an actual physical support), testament, vibrant, crucial, pivotal.
+Words that spike hard in LLM output relative to human baseline: delve, intricate, tapestry, foster, garner, underscore (verb), leverage, holistic, navigate (figurative), robust, landscape (abstract), shape (abstract, for a process or idea rather than a physical object), load-bearing (figurative, for anything other than an actual physical support), dance (figurative, for a multi-step computing process rather than actual dancing), testament, vibrant, crucial, pivotal.
 
 Extended set: meticulous, bolster, interplay, multifaceted, nuanced (as filler), utilize, commence, facilitate, encompass, paramount, groundbreaking, cutting-edge, game-changing, transformative, revolutionize, seamless, comprehensive (describing your own output), endeavor, aforementioned, harness, spearhead, showcase, unprecedented, remarkable, profound, synergy, pain points, thought leadership, moving forward, circle back, rest assured, in essence, it goes without saying.
 
@@ -157,6 +157,7 @@ Specific constructions to cut:
 - Hedge stacks: "it seems like it might potentially be" to "may be." One hedge maximum, and only when the uncertainty is real.
 - Setup clauses that delay the point: "what I'm seeing here is that the test fails" to "the test fails." "The reason for this is that" to "because."
 - Existential openers: "there are several files that need updating" to "several files need updating." "It is the case that" to nothing.
+- Dead metaphors for a process: "the ssh authentication dance" to "ssh authentication," "the token renewal dance" to "token renewal." Name the process with the plain word for it, or "process" or "flow" if it needs a noun. The metaphor adds a knowing wink, not information, and it dodges saying which steps are actually involved.
 
 Fix: say it the way you'd say it out loud to a coworker standing at your desk, then keep that version. If the short version sounds blunt or unpolished, that's the target, not a problem to fix. Blunt reads as human. Polished reads as generated.
 
