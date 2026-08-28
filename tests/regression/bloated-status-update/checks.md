@@ -51,3 +51,7 @@ it says otherwise.
 - [ ] The result is not parataxis: not three or more bare declaratives in a
       row with no connective tissue (group X).
 - [ ] The result is blunt but not curt. No implied hostility.
+- [ ] The input's "wiring up the associated metrics collection" is handled by
+      naming what the metrics give the reader, not by keeping a shorter
+      component inventory and not by dropping the fact. Group B's metaphor
+      ban and group Z's funding test point at the same rewrite here.
