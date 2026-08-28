@@ -57,3 +57,8 @@ step 3.
 - [ ] Nothing invented. No claim about which partner, which volume, or what
       the next phase is. The input does not say, so the output must not.
 - [ ] Not parataxis (group X).
+- [ ] "monitoring is wired up" is not deleted or reworded to something vaguer
+      on account of the group B metaphor ban. "wired up" is the plain idiom
+      here and every alternative says less, so it passes the group B
+      borderline test. A rewrite that produces "monitoring is configured" or
+      drops the fact is a group B over-correction, not a pass.
