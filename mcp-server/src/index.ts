@@ -20,9 +20,10 @@ export const VERBATIM_INSTRUCTION =
 
 export async function handlePersonifyCall(
   text: string,
+  mode: "default" | "both" = "default",
 ): Promise<CallToolResult> {
   const [cliResult, versionResult] = await Promise.all([
-    runPersonify(text),
+    runPersonify(text, { mode }),
     checkPersonifyVersion(),
   ]);
 
@@ -79,6 +80,13 @@ export function createServer(): Server {
           type: "object",
           properties: {
             text: { type: "string", description: "The text to personify." },
+            mode: {
+              type: "string",
+              enum: ["default", "both"],
+              description:
+                "default returns the edited text plus a one-line status. " +
+                "both additionally shows the full A/B comparison.",
+            },
           },
           required: ["text"],
         },
@@ -95,15 +103,19 @@ export function createServer(): Server {
         ],
       };
     }
-    const text = (request.params.arguments as { text?: string } | undefined)
-      ?.text;
+    const args = request.params.arguments as
+      { text?: string; mode?: "default" | "both" } | undefined;
+    const text = args?.text;
     if (typeof text !== "string") {
       return {
         isError: true,
         content: [{ type: "text", text: "missing required argument: text" }],
       };
     }
-    return handlePersonifyCall(text);
+    return handlePersonifyCall(
+      text,
+      args?.mode === "both" ? "both" : "default",
+    );
   });
 
   return server;

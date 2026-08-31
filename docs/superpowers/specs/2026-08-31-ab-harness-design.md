@@ -149,8 +149,10 @@ record is unconsolidated.
 
 ## Output contract
 
-Quiet default. A normal invocation returns the primary arm's text plus one
-line:
+Quiet default. The primary arm is whichever the reviewer picked; on a tie it is
+arm A, so the default favors the rule set already in use and a tie never
+silently advances the new one. A normal invocation returns the primary arm's
+text plus one line:
 
     [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
 

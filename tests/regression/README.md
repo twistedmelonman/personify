@@ -21,7 +21,7 @@ Every case is a directory with four files:
 | File | What it holds |
 |------|---------------|
 | `input.md` | The bloated original. |
-| `expected.md` | What a correct personify pass should produce. Not a string to diff against: a target to judge against, since there are many correct rewrites. |
+| `expected-arm-a.md` | What a correct personify pass should produce. Not a string to diff against: a target to judge against, since there are many correct rewrites. |
 | `checks.md` | The specific assertions that must hold, written so a human or a model can check them one at a time. |
 | `notes.md` | Which groups the case exercises and what a regression would look like. |
 
@@ -48,7 +48,7 @@ case by hand, or by dispatching a subagent per case:
 2. Save the result as `actual-<date>-personify.md`.
 3. Walk `checks.md` and mark each assertion pass or fail.
 4. A failed check is either a regression to fix or an intentional change, in
-   which case update `expected.md` and `checks.md` in the same commit that
+   which case update `expected-arm-a.md` and `checks.md` in the same commit that
    changes `SKILL.md`, and say why in the commit message.
 
 ## When to run it
@@ -56,3 +56,17 @@ case by hand, or by dispatching a subagent per case:
 Any commit touching a pattern group, the Process steps, the Work register
 section, or the Task boards section. Especially any commit that adds or
 re-letters a pattern group, since that is when priority quietly shifts.
+
+## Arms
+
+`expected-arm-a.md` is arm A's expectation. It encodes the taxonomy's idea of
+correct, which is what it was written against.
+
+There is deliberately no `expected-arm-b.md`. Arm B is model judgment, so
+pinning its exact output would either freeze one model's phrasing as correct or
+require rewriting the fixture on every model change. Arm B is judged by the
+reviewer and by accumulated evidence, not by a fixture.
+
+CI asserts the harness produces a well-formed comparison. It does not assert
+which arm wins. That is the question the harness exists to answer, and a CI
+job that answered it would be assuming the conclusion.

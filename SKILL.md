@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 0.6.0
+version: 1.0.0
 description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards and PR comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -19,7 +19,7 @@ Before applying anything below, you MUST actually check disk for the voice guide
 
 Never state that a voice guide is "missing," "not configured," or "not found" without having just run a tool call against that exact path in this turn. If you have not made that call yet, make it before saying anything about voice-guide status.
 
-If a voice guide is found, read it fully and treat it as authoritative. It describes one specific person's writing. Where it conflicts with any rule in this skill, the voice guide wins; the pattern groups below are only a backstop for residue it doesn't address.
+If a voice guide is found, read it fully and treat it as authoritative. It describes one specific person's writing. Where it conflicts with any rule in this skill, the voice guide wins; the pattern groups in `rules/taxonomy.md` and the hard rules in `rules/hard.md` are only a backstop for residue it doesn't address.
 
 If no voice guide is found, read `VOICE.example.md` (in this skill's directory) for what one looks like and how to build it. Without a voice guide this skill makes text non-robotic but not distinctive: clean, competent, anonymous. Proceed with the general rules and say so, so the user knows a voice guide is what turns "not obviously AI" into "sounds like them."
 
@@ -27,211 +27,160 @@ The voice guide is personal and never committed (git-ignored, like `.env`). It l
 
 ## Process
 
-1. Scan for the patterns below.
-2. Rewrite, don't delete: cover every fact the original covers, don't compress it into bullet-point paraphrase. This constrains what you cut, not how short you get: step 4 compresses hard, and the two agree because hedges and throat-clearing are not facts.
-3. Preserve the specifics: names, numbers, concrete details. Never invent facts, dates, or examples that weren't in the source.
-4. De-abstract, then compress. Two passes, in this order, and they matter more than anything else in this file for work communication. First: every sentence describing a judgment or an action, who did it (group W)? Put them in the sentence. Do this first, because compressing "it was decided that we should revisit the cache" can delete the clause that would have told you who decided. Second: every sentence, is the idea smaller than the word count (group V)? Cut until it isn't. Naming the actor usually makes the sentence shorter anyway.
-5. Self-audit: "what in this rewrite would still tag as obviously AI-generated?" Then, for work communication: "would I actually type this to a coworker, or is it a memo?" and "how many words is this carrying that do no work?" For GitHub PR descriptions and review comments specifically, also ask: "would a teammate skimming this diff have written a header here?" and "am I explaining what I didn't do, when nobody asked?" Fix those, then output.
-6. No em dashes or en dashes in the final text: hard rule, not a preference. Replace with a period, comma, or colon. Not parentheses (group O).
+Step 0 above still runs first. The voice guide reaches both arms.
+
+### 1. Probe the context
+
+Determine four things before rewriting anything. Infer first. Ask only when a
+wrong answer would change the output.
+
+- Surface. A PR URL means a PR comment. A repo with a branch and a diff means a
+  PR description. Headers and length suggest a document. Ask only when two
+  surfaces with different registers are equally likely.
+- Audience. Own repo means a familiar teammate, which is the default. A public
+  repo issue reply means a stranger. The voice guide may name recurring people.
+  Ask only when the text addresses someone by name you have no read on.
+- Thread. Run `gh pr view --comments` or `gh issue view --comments` when a URL
+  or number is present. Never ask. If it is unavailable, record it as absent
+  and continue.
+- Project. Read the working directory, its CLAUDE.md, and its README. Never ask.
+
+Record every inferred value, and mark assumed ones as assumed. A recorded wrong
+assumption is better than a question that makes this tool annoying enough to
+stop using.
+
+These `gh` calls are read-only. Never post, comment, or modify.
+
+### 2. Run both arms on the same text
+
+Every `rules/` and `reviewer/` path in this file is relative to this skill's
+own directory, the one holding this SKILL.md, never to the user's working
+directory. The plugin installs into a version-pinned directory, and the text
+being edited usually lives in some other repo entirely, so resolving these
+against the working directory looks for rule files in the user's project and
+finds nothing.
+
+Arm A reads `rules/taxonomy.md` and `rules/learned.md`. It reports which
+lettered groups it applied.
+
+Arm B reads `rules/hard.md` and `rules/learned.md`. It must not read
+`rules/taxonomy.md`. It reports what it removed in plain description, never by
+letter.
+
+Both receive identical context and the same voice guide. Neither sees the
+other's output.
+
+Run each arm as its own subagent, with its own context. This is not an
+optimization, it is what makes arm B's isolation real. Reading a file puts its
+content in context, and no instruction can make a model unread it, so an arm B
+that shares a context with arm A has already seen the taxonomy whatever this
+file says. One context per arm is the only version of "must not read
+`rules/taxonomy.md`" that holds.
+
+Each arm's subagent gets: the text, the context block from step 1, the voice
+guide, and the paths to its own rule files. Not the other arm's rule files, and
+not the other arm's output.
+
+### 3. Review
+
+Run `reviewer/PROMPT.md` with the context and both candidates, labeled 1 and 2,
+without saying which arm produced which. Assign the labels by a real coin flip,
+not by choosing: run `python3 -c "import secrets; print(secrets.randbelow(2))"`
+and give arm A label 1 when it prints 0, label 2 when it prints 1. A model
+asked to "pick randomly" settles into a fixed assignment, which is the position
+bias this is meant to remove. Record which arm got which label in the evidence
+record.
+
+Send the reviewer the two rewritten texts and the context. Nothing else. In
+particular, do NOT send it either arm's report of what it applied: arm A
+reports lettered groups such as "V, W, Z" and arm B reports plain descriptions,
+so those reports identify the arms on sight and defeat the randomization. The
+reports go into the evidence record, which the reviewer does not read.
+
+### 4. Record before showing anything
+
+Write the run to `~/.claude/personify-evidence/YYYY-MM-DDTHH-MM-SS.md` before
+displaying output. Create that directory if it does not exist. The time uses
+hyphens rather than colons because a colon is not portable in a filename.
+
+`docs/evidence-format.md` defines what goes in the file and is required
+reading before writing one. In short: YAML frontmatter carrying the fields
+consolidation counts, then five verbatim sections holding the input, each arm's
+output, the reviewer's four lines, and the user's own text when it is captured.
+Record `arm_a_label`, which says whether the reviewer saw arm A as candidate 1
+or 2, because without it a winning label cannot be traced back to an arm.
+
+The record is what `show both` reads later, so it must exist by the time the
+user sees the result.
+
+### 5. Show the quiet default
+
+The primary arm is whichever one the reviewer picked. Output that arm's text.
+On a tie, output arm A's text and name arm A as primary, so the default favors
+the rule set that is already in use and a tie never silently advances the new
+one.
+
+Name the primary arm in the status line by the letter it actually was, not by
+copying the example below.
+
+Output the winning text, then one line:
+
+    [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
+
+Show the full comparison instead when the user asked for it, when the reviewer
+reported low confidence, or when the arms differ on more than a third of their
+spans. A span here is a sentence: split each arm's output on sentence
+boundaries, and count a sentence as differing when it is not character-for-
+character identical to the sentence at the same position in the other arm's
+output. When the two outputs have different sentence counts, use the longer
+count as the denominator, since a dropped or added sentence is itself a
+difference.
+
+The full comparison carries five things, in this order: the context block from
+step 1, each arm's own report of what it applied, both texts, the diff from arm
+A to arm B, and the reviewer's verdict with the shared residue it named.
+
+    CONTEXT  surface: PR review comment · audience: teammate, familiar
+             thread: 4 prior comments, disagreement about retry logic
+             project: personify
+
+    ARM A                              ARM B
+    applied: V, W, Z                   removed: two hedges, a header
+                                       nobody asked for, "leverage"
+
+    <text A>                           <text B>
+
+    DIFF A to B
+    - We should consider whether the retry logic matters here.
+    + Does anything break if we drop the retry?
+
+    REVIEWER  B. A kept a section header in a 3-sentence comment.
+              Shared residue: both open with "I think".
+
+The diff runs from arm A to arm B, not from the original to the result. Which
+arm changed what is the question this whole comparison exists to answer.
+
+When unconsolidated records reach 25, and again at every later multiple of 25,
+append to that same line:
+
+    · 25 unconsolidated, /personify:personify-consolidate
+
+Never as separate output, never as a question. It repeats because the count
+only resets when consolidation actually runs, so an ignored nudge means the
+evidence is still waiting, not that it stopped mattering.
+
+### 6. Serve later requests from the record
+
+`show both` reads the record. It never re-runs the arms. It works right after a
+result, later in the session, and in a future session when given a timestamp.
+If the record file is gone, say it is unavailable. Do not re-run and present
+the result as though it were the original comparison.
 
 ## Pattern groups
 
-### A. Inflated significance
-
-Watch for: "stands as a testament to," "marks a pivotal moment," "underscores its importance," "the evolving landscape of," "represents a shift," anything that assigns cosmic weight to an ordinary fact. Fix: state the fact plainly and let the reader decide if it's a big deal.
-
-### B. Empty vocabulary cluster
-
-Words that spike hard in LLM output relative to human baseline: delve, intricate, tapestry, foster, garner, underscore (verb), leverage, holistic, navigate (figurative), robust, landscape (abstract), shape (abstract, for a process or idea rather than a physical object), load-bearing (figurative, for anything other than an actual physical support), dance (figurative, for a multi-step computing process rather than actual dancing), testament, vibrant, crucial, pivotal.
-
-Extended set: meticulous, bolster, interplay, multifaceted, nuanced (as filler), utilize, commence, facilitate, encompass, paramount, groundbreaking, cutting-edge, game-changing, transformative, revolutionize, seamless, comprehensive (describing your own output), endeavor, aforementioned, harness, spearhead, showcase, unprecedented, remarkable, profound, synergy, pain points, thought leadership, moving forward, circle back, rest assured, in essence, it goes without saying.
-
-Stock phrases from the same distribution: "in today's [adjective] [noun]," "at its core," "in the realm of," "when it comes to," "this is where X comes in," "whether you're a X or a Y," "at the end of the day," "the bottom line is," "here's the thing," "in a nutshell," "without further ado," "in conclusion," "overall" as a paragraph opener, "firstly / secondly / thirdly," "I hope this finds you well," "please don't hesitate to reach out."
-
-These are weighted signals, not banned words. One in isolation means nothing, and several of them are the correct word in a technical context: "robust" about a retry policy, "comprehensive" about someone else's test suite. Several in one paragraph is a tell. Judge the cluster, not the hit, and see What NOT to flag.
-
-"utilize" and "commence" are the exception: those two are always "use" and "start," because the substitution never loses meaning. They live in group V's verb-inflation list, which is where hard substitutions belong. Everything above stays a weighted signal.
-
-**Physical-structure metaphors for code. These are banned, not weighted.** A building, a body, or a machine borrowed to describe software someone can read the actual mechanism of: load-bearing, seam, ladder, spine, rail, scaffold, substrate, machinery, ratchet, lever, keystone, foundation (abstract), and the carry family used of code (a check that "carries" a guarantee, a module that "carries" the retry logic). Also the survival family used of code: survived, survives, "the assertion survived the refactor."
-
-The test that decides a borderline case: is there a plainer, more specific way to say this? If yes, the metaphor is the tell and gets replaced. If the metaphor is itself the plain idiom and every alternative says less, keep it. "monitoring is wired up" passes, because "monitoring is configured" says less about whether it reaches anything. "the retry logic is load-bearing" fails, because "removing the retry logic breaks X" is both plainer and more specific. Words like plumbing, wiring, and glue sit on this line and go either way. Judge them by this test, not by a list.
-
-Scope, because it is narrow and the rest of this file depends on it. The ban covers these words used to describe **software** whose actual mechanism the writer could name instead. It does not cover: the literal sense (a load-bearing wall, a seam in a texture, a physical rail, a ladder); a type or symbol named in the code (`Carrier`, `Substrate`, a `scaffold` command); or the ordinary editorial sense of carry and survive applied to **writing** rather than to code, as in "the sentence carries one idea" or "what survives compression." That editorial usage is standard English about text, it is used throughout this file, and it is not the tell.
-
-Why banned rather than weighted: each one dresses an ordinary fact as an insight. "This check is load-bearing" says the check matters, at more words and less precisely than "removing this check breaks X." The metaphor also flatters the writer, which is the group K failure arriving one word at a time. Fix: name the mechanism. "load-bearing" becomes what breaks without it. "the seam between A and B" becomes the interface, the boundary, or the actual function that connects them. "survived the refactor" becomes "the refactor did not change it." See group S for the same tell at paragraph scale, and Work register for the ASD-STE100 bias this follows from.
-
-**Hyphenated precision coinages, weighted.** byte-identical, byte-for-byte, pre-fix, post-fix, wall-clock, fan-out, in-flight, one-line, hand-rolled, unit-tested, fail-open, fail-closed, round-trip, no-op, on-disk, per-request. These are real terms and several are the only accurate word for the thing. The tell is reaching for one where a plain word would do, and stacking several in a paragraph: "byte-identical" for two files that are the same, "pre-fix" for before, "wall-clock" for how long it took when no other clock is in play. Use the coinage when the distinction it draws is live in the sentence, and the plain word when it is not.
-
-**Adverbs and adjectives from the same distribution, weighted rather than banned:** quietly, loudly, silently, genuine, genuinely, honest, honesty, honestly, deliberate, deliberately, latent, precisely, exactly, merely, structurally, unconditionally, verbatim, cleanly. Each has a correct use: a job that fails silently is a real and specific failure mode, and "deliberately" is right when the alternative reading is that something was an accident. The tell is the cluster and the decorative use, where the adverb sets a mood rather than adding a fact.
-
-This is a weighted signal and not a default cut. Delete the adverb and read the sentence again. If the sentence still says the same thing, leave the adverb out; if it loses a fact, such as which of two failure modes happened, keep it. Never delete one to hit a word count, and never add one the source did not support, since that invents specificity (Work register). Counts are not on this list at all: an exact number is a fact, and where a voice guide asks for exact counts it wins outright, per Step 0.
-
-### C. Copula avoidance
-
-"Serves as," "boasts," "features," "stands as" substituted for plain "is/has." Fix: use the boring verb.
-
-### D. Negative parallelism / "not X, but Y"
-
-"It's not just about the beat, it's the atmosphere." Also tailing negations like "no wasted motion" bolted onto a sentence. This construction creates an illusion of insight while adding nothing. State the point once, directly.
-
-### E. Rule of three, everywhere
-
-Not just three-item lists ("innovation, inspiration, insight") but three-part *structures*: three-step processes, three examples, three parallel clauses per paragraph, used as the skeleton of an entire piece. If you can't stop finding threes, you're pattern-completing. Vary list length; use two, four, or none.
-
-### F. Epistrophe / repetition as gravity
-
-Repeating a word or clause purely to manufacture weight ("falls, and falls, and falls"; closing on "the biggest X I have ever seen"). No new information, just emphasis through repetition. Cut it; if the content needs the repetition to feel important, the content isn't earning the importance on its own.
-
-### G. Staccato fragments as punchlines
-
-Long buildup sentence, then a one- or two-word fragment dropped for drama ("That is the story now." "Ubiquity."). A single clipped sentence for emphasis is fine. A run of them in one piece is engineered drama. Use full sentences, or cut the theatrics.
-
-### H. Self-narrating structure
-
-The text announces its own outline as it goes: "it is worth naming the steps precisely," "now think about what that means," "which brings us to the trap," "let's dive in." Just make the point; don't narrate making it.
-
-Emotional-arc section headers are the same tell in heading form. Short headers naming a mood or beat rather than a topic ("The weather," "The scream," "The close") turn the piece into a script narrating its own dramatic structure. Fine once as a title. A full set of them running through one piece is self-narration by another route.
-
-### I. Rhetorical question as connective tissue
-
-Posing a question purely to answer it in the next sentence, used repeatedly as the joint between sections rather than genuine inquiry. Fine once. A tell as a recurring transition device.
-
-### J. False-discovery framing
-
-"It turns out that X" used to dress up an asserted premise as an empirical finding when nothing was tested or discovered. State the claim; don't costume it as a revelation.
-
-### K. Escalating grandiosity
-
-Each section or closing line tries to out-stake the last ("a categorically larger event" -> "the biggest one I have ever seen"). Stakes should come from evidence, not adjectival inflation.
-
-### L. False ranges
-
-"From the Big Bang to dark matter" where the two ends aren't actually on a meaningful scale. List the actual topics instead.
-
-### M. Vague attribution
-
-"Experts believe," "industry reports suggest," "observers have noted" without a named source. Name the source or cut the claim.
-
-### N. Formulaic "despite challenges" close
-
-"Despite these challenges, X continues to thrive." Formulaic hedge-then-boost pattern that adds nothing sourced. Keep the concrete facts, cut the boosterism.
-
-### O. Style mechanics
-
-- Em/en dashes: cut, no exceptions (see Process, step 6). Replace with a period, comma, or colon. Not parentheses: see the aside rule below.
-- Parenthetical asides: no parentheses, and no relocating an aside into a different set of parentheses elsewhere. Sort by content first. An aside carrying color, hedging, or restatement gets deleted outright. An aside carrying a fact, number, or technical caveat is never deleted (Process, step 3): promote it into the sentence as a plain clause, or make it its own short sentence. The rule bans the parenthetical construction, not the information inside it. Same for appositives and "which"/"that" clauses.
-- Exclamation marks: at most one per long piece, and usually zero. Enthusiasm comes from word choice.
-- Ellipses: only for genuinely trailing off, never as a transition.
-- Semicolons: fine to use. Models underuse them and good human writers reach for them naturally.
-- Markdown in plain-text contexts (email, DM, SMS, Slack): no headers, no bold, no asterisks. Raw asterisks rendering as literal symbols is an instant tell.
-- Hashtag stacks: zero to two, integrated into the sentence.
-- Emoji as bullet points: every line starting with a checkmark or flame is slop. One or two emoji in a casual post is fine.
-- Boldface used mechanically on scattered terms: drop it
-- "**Label:** content" bullet lists: convert to prose or a plain list
-- Title Case Headings: sentence case instead
-- Emoji as decoration: remove
-- Curly quotes: straight quotes
-- Hyphenating predicate-position compounds ("the report is high-quality"): only hyphenate when attributive ("a high-quality report")
-
-### P. Chatbot residue
-
-"I hope this helps," "Great question!," "Let me know if you'd like me to expand," cutoff disclaimers ("as of my last update"), speculative gap-filling dressed as fact ("likely grew up in a middle-class household"). Cut, or state plainly what isn't known.
-
-### Q. Filler and hedging
-
-"In order to" -> "to." "Due to the fact that" -> "because." "Could potentially possibly" -> "may." "It is important to note that" -> cut it, state the thing.
-
-### R. Aphorism-per-paragraph density
-
-Nearly every paragraph lands on a standalone, quotable epigram ("Volume reads as veracity," "The calm is not a temperament, it is a tax"). One or two of these in a long piece is a writer's signature. When almost every paragraph ends this way, the piece reads as a string of pull-quotes rather than an argument, and it starts to sound engineered even when hand-written. Let some paragraphs just end.
-
-### S. One extended metaphor doing all the structural work
-
-A single image introduced early (a dial, a fire, a tax) that the piece keeps returning to as its organizing device for every subsequent point. Effective in small doses; overused it becomes a crutch that substitutes for making the next point on its own terms. Watch for a metaphor reappearing three or more times as connective tissue rather than illustration.
-
-### T. Self-justifying importance claims
-
-A sentence asserts its own importance in place of content: "the key insight here, and this is the crucial part, is that the cache is cold on first request." Cut the assertion, keep the fact. Distinct from H (narrating the outline) and A (inflating an ordinary fact): here the sentence is about its own weight, not the structure or the subject.
-
-### U. Point-by-point question mirroring
-
-Quoting or restating each of the asker's sub-points in order, then answering each fully in its own paragraph, so the response's structure exactly tracks the question's enumeration. This reads as assistant-triage regardless of how good the individual answers are: a human reply merges points, answers out of order, or skips a sub-question the first answer already covers. Fix: answer in flowing prose using the order the points naturally connect in, not the order they were asked in. Fix it by reorganizing the response, not by chopping sentences at random: the two problems are separate, and fragmenting a mirrored answer leaves it still mirrored. In long-form prose, complete correctly punctuated sentences are not themselves a tell (see What NOT to flag). In work communication, fragments are actively wanted, but for the reasons in Work register, not as a fix for this group.
-
-### V. Too many words for a simple concept
-
-The highest-priority pattern in this skill, alongside W. A simple idea arrives wrapped in a construction three times its necessary size. The sentence is grammatical, accurate, and completely correct, which is exactly why it slips through: nothing is wrong with it except that nobody would say it that way.
-
-The tell isn't vocabulary, it's ratio. Count the words against the idea underneath. "We should consider whether it might make sense to revisit the caching approach" carries one idea, "maybe we should redo the cache," in four times the words. Every extra word is doing hedging or throat-clearing rather than carrying meaning.
-
-Specific constructions to cut:
-
-- Nominalizations back to verbs: "perform an analysis of" to "analyze," "make a determination" to "decide," "provide clarification" to "clarify," "has a dependency on" to "needs."
-- Verb inflation: "utilize" to "use," "commence" to "start," "facilitate" to "help," "implement a fix" to "fix," "leverage" to "use."
-- Prepositional pileups: "in the event that" to "if," "for the purpose of" to "to," "with regard to" to "about," "in the vicinity of" to "near," "at this point in time" to "now," "on a daily basis" to "daily."
-- Hedge stacks: "it seems like it might potentially be" to "may be." One hedge maximum, and only when the uncertainty is real.
-- Setup clauses that delay the point: "what I'm seeing here is that the test fails" to "the test fails." "The reason for this is that" to "because."
-- Existential openers: "there are several files that need updating" to "several files need updating." "It is the case that" to nothing.
-- Dead metaphors for a process: "the ssh authentication dance" to "ssh authentication," "the token renewal dance" to "token renewal." Name the process with the plain word for it, or "process" or "flow" if it needs a noun. The metaphor adds a knowing wink, not information, and it dodges saying which steps are actually involved.
-
-Fix: say it the way you'd say it out loud to a coworker standing at your desk, then keep that version. If the short version sounds blunt or unpolished, that's the target, not a problem to fix. Blunt reads as human. Polished reads as generated.
-
-Do not preserve length by relocating words. The compressed version is the output.
-
-### W. Impersonal framing
-
-The highest-priority pattern alongside V. A human made a choice, held an opinion, or did a thing, and the sentence hides that human behind a process, an abstraction, or a passive construction. This is the single strongest reason correct technical writing reads as machine-generated: machines have no first person, so prose with no first person reads as machine-written even when a person wrote it.
-
-Watch for:
-
-- Passive voice hiding the actor: "the config was updated" to "I updated the config." "It was decided that" to "we decided" or "I decided." "Mistakes were made" to who made them.
-- Abstractions as grammatical subject: "this approach introduces risk" to "I think this breaks under load." "The implementation handles retries" to "it retries." "The changes address the issue" to "this fixes the bug."
-- Opinions laundered as observations: "it may be worth considering X" to "I'd do X." "One could argue that" to "I think." "There are concerns about" to "I'm worried about."
-- Missing subjects generally: if a sentence describes a judgment, someone made it. Name them, usually "I" or "we."
-- Credential openers: "as the author of this module, I..." Just say the thing.
-
-Fix: put a person in the sentence. "I," "we," "you," or a named human. State opinions as opinions and own them: "I think," "I'd rather," "I don't know," "this seems wrong to me." Hedging into impersonality to sound measured is the exact move that reads as AI.
-
-Carve-outs, both narrow. Reference documentation and API docs stay neutral, because there genuinely is no actor. And a PR description narrating what its own diff does can lead with the verb ("gives `deploy-bot` assume-role"), since the author is unambiguous from the PR metadata. Everywhere else at work, including review comments, status updates, Slack, design docs, and email to the team, takes the first person. The carve-out is about actors that are already obvious, not permission to hedge: any sentence carrying a judgment, a doubt, or a decision names the person who holds it, PR descriptions included.
-
-### X. Uniform rhythm and parataxis
-
-Two opposite failures, both measurable, both tells.
-
-Uniform sentence length: three consecutive sentences of roughly the same length reads as generated regardless of content. Mix a four-word sentence against a thirty-word one. This needs three sentences to apply at all, so it's silent on a two-line Slack message. Don't manufacture length variance in something too short to have rhythm.
-
-Parataxis: a run of short declaratives with no connective tissue. "The build failed. The cache was stale. I cleared it." Reads like a poem, signals AI immediately. Connect them so the syntax shows how the ideas relate: "build failed because the cache was stale, cleared it."
-
-Related structural tells: the same paragraph pattern repeated throughout (topic sentence, explanation, example, transition, repeat), parallel structure across every section, and more than five to seven bullets in a row. Vary it. Let some paragraphs be one sentence. Let some end without a transition.
-
-Note the interaction with V: compression is not permission to produce parataxis. Compress by cutting words, then connect what remains with conjunctions and subordination, not by chopping into a stack of stubs.
-
-### Y. Hedging seesaw and corporate pep talk
-
-Hedging seesaw: presenting both sides at equal weight to avoid committing. "There are benefits to X, though Y also has merits, and the right choice depends on context." Pick a side, state it plainly, give a counterpoint one sentence at most. If you genuinely don't know, say "I don't know" and stop, which is a position and reads as human.
-
-Corporate pep talk: cheerleading register with no experience behind it. "Empower," "elevate," "supercharge," "unlock the power of," "move the needle," "take it to the next level," "bridge the gap," "streamline your workflow." Also the closing-boosterism reflex, which is group N seen from a different angle. Write like someone who has actually done the work, including the parts that were annoying.
-
-Also in this family: filler transitions used as connective tissue, "moreover," "furthermore," "additionally," "notably," "importantly," "interestingly," "indeed." Delete them. The relationship between two sentences should come from their content, and if it doesn't, the transition word is patching a structural problem.
-
-### Z. Implementation described instead of outcome
-
-The text lists what was built, in accurate technical terms, and never says what it produces or why anyone should care. Every noun is correct. The reader still cannot tell what they got. Compression does not fix this one, which is what separates it from V and W.
-
-"Ingest glue for the staging bucket, flat-file index, no managed DB for a trial, single container deployment, matches the layout two other services already use" is the pattern. It is precise, dense, and honest, and it fails, because it answers "what did you assemble" when the reader asked "what can we do now that we could not do before."
-
-The test, and it is a hard one to pass: **if this were shown to the person paying for the work, could they tell why it was worth paying for?** Not whether they would understand the jargon. Whether they could see the point. Apply it to every task title, milestone, status update, and PR description.
-
-How to fix it:
-
-- Lead with the end state, not the parts. "The package proxy is running and serving internal builds" rather than an inventory of the modules that make it run.
-- Write titles as declarative end states, the thing being true when you are done: "config index deployed to the cluster with health checks" rather than "config index work."
-- Name the capability, then the mechanism, and only if the mechanism matters to the reader. Implementation detail belongs in the body or in the diff.
-- Cut the "follows the existing pattern" reassurance unless a reviewer specifically needs it. It is defensive completeness (see the GitHub section) and it reads as filler to anyone above the code.
-- Never log something that happened as if it were work you did. "A teammate asked about pairing" is an event. "Paired with them on the registry auth patch" is work.
-
-This pattern coexists with V (too many words) and is not the same failure. V is a long sentence carrying a small idea. Z is an accurate sentence carrying the wrong kind of idea, and it survives compression untouched: shortening a list of components just yields a shorter list of components. Fix Z first, because it changes what the sentence is about; then apply V to whatever survives.
-
-Distinct from A (inflated significance) in the exact opposite direction. A dresses an ordinary fact in cosmic language. Z strips a genuinely valuable outcome down to plumbing. The fix for A is to deflate; the fix for Z is to state the value plainly, once, without adjectives.
+The lettered pattern groups A through Z live in `rules/taxonomy.md`. Arm A
+reads them. Every reference to a group letter in this file resolves to that
+file.
 
 ## What NOT to flag
 
@@ -275,7 +224,7 @@ The two axes are audience and length, and they come apart. A company blog post i
 
 The premise: a careful writer's natural work register is polished, complete, evenly hedged, and impersonal, and that register is now indistinguishable from model output. Grammatical polish is not the goal here. Sounding like a specific tired person typing between meetings is the goal. Bias hard toward informal and short. When a rewrite feels too blunt or too casual, it is probably right.
 
-Compression removes words. It never adds specificity. This is the failure mode of everything above: rewriting toward how you'd say it out loud pulls hard toward concrete mechanism, and concrete mechanism is often exactly what the source didn't have. "the invalidation logic may be the source of the stale reads" compresses to "cache invalidation was the cause," not to "cache invalidation was dropping the wrong keys." The second is punchier, sounds more human, and asserts something nobody established. If the vague version is what you know, ship the vague version short (Process, step 3).
+Compression removes words. It never adds specificity. This is the failure mode of everything above: rewriting toward how you'd say it out loud pulls hard toward concrete mechanism, and concrete mechanism is often exactly what the source didn't have. "the invalidation logic may be the source of the stale reads" compresses to "cache invalidation was the cause," not to "cache invalidation was dropping the wrong keys." The second is punchier, sounds more human, and asserts something nobody established. If the vague version is what you know, ship the vague version short (never invent facts: `rules/hard.md`, rule 3).
 
 Write for a reader with no context. This is the rule that cuts hardest against the instinct to make a permanent record precise and technical. Task boards, milestones, and status updates get read by people who were not in the conversation, do not know the codebase, and are deciding whether the work was worth funding. Precision aimed at a peer reads as opacity to them, and opacity reads as either padding or as text nobody thought about. Assume the reader knows the goal and nothing about the implementation. Group Z is the pattern this produces when it goes wrong.
 
@@ -300,7 +249,7 @@ Defaults, which override the general guidance elsewhere in this skill:
 - Use a list when the content is genuinely a list (steps, findings, changes). Don't force prose into a list, or a list into prose.
 - Skip the greeting and the sign-off in short internal messages. Start with the content.
 
-What survives compression, and this is not negotiable: names, numbers, file paths, error text, technical caveats, and anything a reader would act on. What gets cut: hedges, qualifiers, restatements, throat-clearing, defensive completeness, and softening. Losing nuance is acceptable here. Losing a fact is not (Process, step 3).
+What survives compression, and this is not negotiable: names, numbers, file paths, error text, technical caveats, and anything a reader would act on. What gets cut: hedges, qualifiers, restatements, throat-clearing, defensive completeness, and softening. Losing nuance is acceptable here. Losing a fact is not (never invent facts: `rules/hard.md`, rule 3).
 
 Worked example, a status update:
 
@@ -324,7 +273,7 @@ Even here, cut words, not content. Keep every fact, caveat, and detail the origi
 
 ## GitHub PR descriptions and review comments
 
-A specific failure mode within technical content: unearned structure and defensive completeness, rather than flowery prose. None of the pattern groups above catch it, because the sentences themselves can be plain. What reads as AI-generated here is ceremony: headers a one-line change doesn't need, and a rundown of tests that don't apply that nobody asked about.
+A specific failure mode within technical content: unearned structure and defensive completeness, rather than flowery prose. None of the pattern groups in `rules/taxonomy.md` catch it, because the sentences themselves can be plain. What reads as AI-generated here is ceremony: headers a one-line change doesn't need, and a rundown of tests that don't apply that nobody asked about.
 
 - **Size the description to the diff.** A one-line, self-explanatory change gets a one-line description. Headers ("Summary," "Testing," "Impact") are earned by a PR that actually spans multiple files or concerns and needs navigation, not a default template.
 - **State what and why. Never how.** The diff is the how. If the description restates what the code already shows, cut it.
