@@ -72,6 +72,19 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     expect(result.tools[0].inputSchema.required).toEqual(["text"]);
   });
 
+  it("advertises the mode argument in the tool schema", async () => {
+    const client = await connectedClient();
+
+    const result = await client.listTools();
+
+    const schema = result.tools[0].inputSchema as {
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(schema.properties).toHaveProperty("mode");
+    expect(schema.properties.mode.enum).toEqual(["default", "both"]);
+    expect(schema.required).toEqual(["text"]);
+  });
+
   it("calls the personify tool over a real handshake and gets a real result", async () => {
     runPersonifyMock.mockResolvedValue({ ok: true, text: "clean text" });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
