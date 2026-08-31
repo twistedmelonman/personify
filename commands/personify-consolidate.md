@@ -22,12 +22,21 @@ miscalibrated in two directions at once.
 record's `arm_a_groups`. Report each with its zero count. This is the only
 signal that makes the taxonomy smaller.
 
-**Wrong rules.** Records where `arm_a_groups` contains a group and
-`reviewer_winner` is `b` and the reviewer's `WHY:` names that group's effect.
-Report the group and the count.
+**Wrong rules.** Records where `arm_a_groups` contains a group, and
+`reviewer_winner` is `b`, and the reviewer's `WHY:` line names what that group
+did to the text. Report the group and the count.
+
+"Names what the group did" means the WHY line describes the edit, not the
+group's letter. The reviewer never sees group letters, so a WHY line saying
+"kept a section header in a 3-sentence comment" is what an over-applied group U
+looks like from the outside. Match on the described effect. When you cannot
+tell which group a WHY line refers to, leave it out rather than guessing: a
+wrongly attributed group is worse than an uncounted one.
 
 **Shared residue.** Every `shared_residue` entry, grouped by similarity, with
-counts. An entry seen once is noise. An entry is a candidate rule for
+counts. Two entries are the same when they name the same tell, not when they
+share wording: "opens with I think" and "leads with I think" are one entry.
+An entry seen once is noise. An entry is a candidate rule for
 `rules/learned.md` when it appears at least 5 times AND on at least two
 different surfaces AND in under half the records read.
 
@@ -39,8 +48,13 @@ surfaces stops a habit specific to PR comments becoming a rule applied to
 email. An empty `shared_residue` list contributes nothing and is not an
 entry.
 
-**Arm win rate by surface.** Count `reviewer_winner` per `surface`. Report as a
-table. This is what eventually answers whether dumbify can be dropped.
+**Arm win rate by surface.** Count `reviewer_winner` per `surface`. The table
+has three columns, `a`, `b`, and `tie`, because `tie` is a value the reviewer
+can return and dropping it overstates whichever arm is ahead. Report ties as
+their own column, never folded into either arm and never omitted.
+
+This is what eventually answers whether dumbify can be dropped, so an
+overstated margin here is the most expensive error in this command.
 
 Weight records with `audience_assumed: true` lower when they are the only
 support for a proposal, and say so in the proposal.
