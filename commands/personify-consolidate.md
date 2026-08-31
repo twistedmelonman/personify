@@ -6,6 +6,8 @@ disable-model-invocation: true
 # Consolidate personify evidence
 
 Read every record in `~/.claude/personify-evidence/`, then propose rule changes.
+Every record, not only the ones newer than `.consolidated`: that marker counts
+what is waiting, and a dead rule is one that has never fired in any run.
 Propose only. Never edit a rules file directly, and never commit to main.
 
 ## Refuse to run on thin evidence
@@ -25,8 +27,17 @@ signal that makes the taxonomy smaller.
 Report the group and the count.
 
 **Shared residue.** Every `shared_residue` entry, grouped by similarity, with
-counts. An entry seen once is noise. An entry seen 5 or more times across
-different surfaces is a candidate rule for `rules/learned.md`.
+counts. An entry seen once is noise. An entry is a candidate rule for
+`rules/learned.md` when it appears at least 5 times AND on at least two
+different surfaces AND in under half the records read.
+
+The three conditions together are what make it a rule rather than an artifact
+of one run. Five hits out of five records is not evidence of a general tell,
+it is one afternoon; the "under half" condition rejects it and keeps rejecting
+it until the corpus is large enough for five hits to mean something. Two
+surfaces stops a habit specific to PR comments becoming a rule applied to
+email. An empty `shared_residue` list contributes nothing and is not an
+entry.
 
 **Arm win rate by surface.** Count `reviewer_winner` per `surface`. Report as a
 table. This is what eventually answers whether dumbify can be dropped.

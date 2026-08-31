@@ -110,6 +110,12 @@ a corrected version, says what they changed, or the posted comment turns up via
 consolidation run. Records newer than it are unconsolidated. A missing file
 means every record is unconsolidated.
 
+The marker drives the nudge only. Consolidation itself reads every record in
+the directory, not just the unconsolidated ones. Dead-rule detection asks
+whether a group has fired in any run ever, so reading only the newest records
+would declare groups dead that fired before the last consolidation. The marker
+answers "how much new evidence is waiting", never "what may be read".
+
 Counting unconsolidated records, rather than total runs or elapsed days, is what
 drives the nudge at 25. The count measures how much unread evidence exists,
 which is the only thing that determines whether consolidation has anything to
