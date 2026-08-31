@@ -113,6 +113,21 @@ Note that a `VOICE.md` outranks both. If your voice guide says you write in
 complete sentences, that wins over dumbify's fragment preference, and stacking
 dumbify on top will fight it.
 
+## How it learns
+
+Every invocation runs two rule sets against your text: the hand-maintained
+taxonomy, and current model judgment held to a short list of hard rules. A
+blind reviewer picks a winner and names what both missed. The run is recorded
+to `~/.claude/personify-evidence/`.
+
+You see one line by default. Ask `show both` for the full comparison, at any
+point, including a later session if you give it the timestamp.
+
+After 25 unconsolidated records, the status line suggests
+`/personify:personify-consolidate`. That pass reads the evidence and proposes
+rule changes as a PR: rules that never fire, rules that made output worse, and
+tells both arms keep missing. You approve each one. Nothing edits itself.
+
 ## License
 
 MIT. See [LICENSE](LICENSE) for the full text and provenance note.
