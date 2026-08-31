@@ -10,6 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 FORMAT = ROOT / "docs" / "evidence-format.md"
 
 REQUIRED_FIELDS = (
+    "timestamp:",
     "surface:",
     "audience:",
     "audience_assumed:",
