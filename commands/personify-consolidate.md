@@ -40,6 +40,11 @@ An entry seen once is noise. An entry is a candidate rule for
 `rules/learned.md` when it appears at least 5 times AND on at least two
 different surfaces AND in under half the records read.
 
+A consequence worth expecting: no learned rule can appear until roughly 11
+records exist, since 5 hits must also be under half the records read. The first
+consolidation runs correctly produce dead-rule and win-rate output and no
+learned rules at all. That is the thresholds working, not a fault.
+
 The three conditions together are what make it a rule rather than an artifact
 of one run. Five hits out of five records is not evidence of a general tell,
 it is one afternoon; the "under half" condition rejects it and keeps rejecting
@@ -53,8 +58,11 @@ has three columns, `a`, `b`, and `tie`, because `tie` is a value the reviewer
 can return and dropping it overstates whichever arm is ahead. Report ties as
 their own column, never folded into either arm and never omitted.
 
-This is what eventually answers whether dumbify can be dropped, so an
-overstated margin here is the most expensive error in this command.
+This table is what eventually answers whether the taxonomy earns its place, so
+an overstated margin here is the most expensive error in this command. It
+compares `rules/taxonomy.md` against `rules/hard.md`, nothing else. Whether a
+downstream pass such as dumbify is still needed is a conclusion someone draws
+from arm B's output later, not a thing this harness measures.
 
 Weight records with `audience_assumed: true` lower when they are the only
 support for a proposal, and say so in the proposal.
