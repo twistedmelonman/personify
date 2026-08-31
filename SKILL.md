@@ -99,8 +99,9 @@ reports go into the evidence record, which the reviewer does not read.
 
 ### 4. Record before showing anything
 
-Write the run to `~/.claude/personify-evidence/<ISO8601>.md` before displaying
-output. The record is what `show both` reads later, so it must exist by the
+Write the run to `~/.claude/personify-evidence/YYYY-MM-DDTHH-MM-SS.md` before
+displaying output. Create that directory if it does not exist. The time uses
+hyphens rather than colons because a colon is not portable in a filename. The record is what `show both` reads later, so it must exist by the
 time the user sees the result.
 
 ### 5. Show the quiet default
@@ -128,7 +129,7 @@ difference.
 
 When unconsolidated records reach 25, append to that same line:
 
-    · 25 unconsolidated, /personify-consolidate
+    · 25 unconsolidated, /personify:personify-consolidate
 
 Never as separate output, never as a question.
 
