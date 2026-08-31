@@ -70,6 +70,10 @@ cannot be derived at all.
 `"none"` and never an omitted key, even though the reviewer writes `none` in
 its own output. The recorder translates.
 
+`thread` is short free text, not a count or a structure. Consolidation groups
+records by surface and audience, never by thread, so the field is there for a
+human reading a record. `none` is the value when no thread was found.
+
 `arm_a_groups` and `arm_b_removals` are always lists. An arm that changed
 nothing gets `[]`.
 
