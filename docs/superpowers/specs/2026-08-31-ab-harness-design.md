@@ -142,6 +142,11 @@ they changed, or the skill later sees the posted comment via `gh`, it amends
 the existing record. No prompt is ever issued. Records lacking a final edit
 still count, with less weight.
 
+Consolidation state lives in `~/.claude/personify-evidence/.consolidated`, which
+holds the timestamp of the last consolidation run. Records newer than it are
+unconsolidated, which is what the nudge counts. A missing file means every
+record is unconsolidated.
+
 ## Output contract
 
 Quiet default. A normal invocation returns the primary arm's text plus one
@@ -179,15 +184,71 @@ Nothing edits the rules automatically. A separate, explicitly invoked
 `/personify-consolidate` pass reads accumulated records and proposes changes as
 a PR:
 
-- rules arm A applied that the reviewer judged wrong
-- residue both arms missed repeatedly
-- dead rules that never fired across many records
+**Dead rules.** Taxonomy groups that never fired across the record set. A group
+that has not triggered in 80 runs costs maintenance and taxonomy space for
+nothing. This is the only mechanism in the design that makes the rule set
+smaller, and its absence is why the letters ran out.
 
-The third is the only mechanism in this design that makes the taxonomy smaller.
-Its absence is why the letters ran out.
+**Wrong rules.** Cases where arm A applied a group and the reviewer preferred
+arm B because of that application. A rule that makes output worse costs more
+than a dead one.
 
-Consolidation stays manual, never threshold-triggered. A rule inferred from too
-few records is how the skills became miscalibrated in two directions at once.
+**Shared residue.** Text both arms left in that the reviewer flagged, or that
+the user removed by hand. Neither current judgment nor the taxonomy caught it.
+This is the only source of new rules.
+
+**Arm win rate by surface.** Whether one arm wins on PR comments and loses on
+long-form docs. This is what eventually answers whether `dumbify` can be
+dropped.
+
+Output is a PR with a count behind every proposal, for example "remove group L,
+zero applications in 80 records" or "add a rule for X, both arms missed it in 6
+of 80 runs, user cut it by hand in 4". Each is approved, rejected, or edited by
+the user. Consolidation never commits to main and never edits rules unreviewed.
+
+### Where new rules go
+
+A rule found in shared residue goes into `rules/learned.md`, which both arms
+read. Not into the taxonomy, which would grow the thing this is meant to shrink
+and burn letters that have run out. Not into `rules/hard.md`, which would
+corrupt the test, since arm B is judgment plus a fixed minimum. A shared file
+keeps the A-versus-B comparison honest, because both arms receive the addition
+equally.
+
+### Distinguishing a rule from a one-off
+
+`calibrate-register` separated a genuine filter bug from a context-specific
+judgment by interviewing the user. This design drops the interview, so
+consolidation infers it from repetition instead: a thing fixed once is noise, a
+thing fixed six times across different surfaces is a rule. This is a weaker
+signal than asking, and it is the accepted cost of removing the step that made
+the previous skill go unused.
+
+Consolidation stays manual. It never fires on its own, and never edits rules
+without review. A rule inferred from too few records is how the skills became
+miscalibrated in two directions at once.
+
+Manual invocation has a failure mode of its own: a pass nobody runs leaves the
+evidence directory unread, which is `calibrate-register`'s failure with extra
+steps. The nudge addresses it.
+
+### The nudge
+
+When unconsolidated records since the last consolidation reach 25, the status
+line gains a short suffix:
+
+    [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22
+     · 25 unconsolidated, /personify-consolidate]
+
+Non-blocking, non-modal, no separate output. It appends to the line that is
+already printed and never interrupts the invocation that triggered it.
+
+The trigger counts unconsolidated records, not total runs. Elapsed time is not
+used: 25 runs in a day and 25 over two months carry the same evidence, and only
+the count determines whether consolidation has anything to say.
+
+The nudge repeats at each subsequent multiple of 25, so a suppressed pass is
+raised again rather than silently dropped.
 
 Terminology: this pass is called consolidation. It reads recorded runs and
 proposes edits to a markdown file for human approval. It does not train
@@ -200,6 +261,7 @@ anything, and ML training vocabulary is not used for it.
 | `SKILL.md` | rewritten | Orchestrator: probe, both arms, reviewer, recorder |
 | `rules/taxonomy.md` | new, moved verbatim | Arm A's rule set |
 | `rules/hard.md` | new | Arm B's rule set, under 60 lines |
+| `rules/learned.md` | new, starts empty | Rules consolidation added from evidence. Both arms read it |
 | `reviewer/` | new | Reviewer prompt and swappable backend interface |
 | `scripts/validate_skill.py` | updated | Heading check follows taxonomy to its new file |
 | `mcp-server/src/` | updated | Quiet-default line and `show both` path |
