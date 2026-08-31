@@ -127,6 +127,30 @@ output. When the two outputs have different sentence counts, use the longer
 count as the denominator, since a dropped or added sentence is itself a
 difference.
 
+The full comparison carries five things, in this order: the context block from
+step 1, each arm's own report of what it applied, both texts, the diff from arm
+A to arm B, and the reviewer's verdict with the shared residue it named.
+
+    CONTEXT  surface: PR review comment · audience: teammate, familiar
+             thread: 4 prior comments, disagreement about retry logic
+             project: personify
+
+    ARM A                              ARM B
+    applied: V, W, Z                   removed: two hedges, a header
+                                       nobody asked for, "leverage"
+
+    <text A>                           <text B>
+
+    DIFF A to B
+    - We should consider whether the retry logic matters here.
+    + Does anything break if we drop the retry?
+
+    REVIEWER  B. A kept a section header in a 3-sentence comment.
+              Shared residue: both open with "I think".
+
+The diff runs from arm A to arm B, not from the original to the result. Which
+arm changed what is the question this whole comparison exists to answer.
+
 When unconsolidated records reach 25, append to that same line:
 
     · 25 unconsolidated, /personify:personify-consolidate
