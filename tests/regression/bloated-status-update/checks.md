@@ -39,7 +39,7 @@ it says otherwise.
 - [ ] "follow the same layout that two other services already use" is cut.
       It is reviewer reassurance, not an outcome.
 
-## Facts that must survive (Process step 3)
+## Facts that must survive (never invent facts: `rules/hard.md`, rule 3)
 
 - [ ] PR number #813.
 - [ ] The caveat that only the read path was validated.
