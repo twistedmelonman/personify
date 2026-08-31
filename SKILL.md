@@ -63,6 +63,17 @@ letter.
 Both receive identical context and the same voice guide. Neither sees the
 other's output.
 
+Run each arm as its own subagent, with its own context. This is not an
+optimization, it is what makes arm B's isolation real. Reading a file puts its
+content in context, and no instruction can make a model unread it, so an arm B
+that shares a context with arm A has already seen the taxonomy whatever this
+file says. One context per arm is the only version of "must not read
+`rules/taxonomy.md`" that holds.
+
+Each arm's subagent gets: the text, the context block from step 1, the voice
+guide, and the paths to its own rule files. Not the other arm's rule files, and
+not the other arm's output.
+
 ### 3. Review
 
 Run `reviewer/PROMPT.md` with the context and both candidates, labeled 1 and 2,
