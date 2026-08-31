@@ -12,7 +12,8 @@ vi.mock("../src/token.js", () => ({
   loadOAuthToken: (...args: unknown[]) => loadOAuthTokenMock(...args),
 }));
 
-const { runPersonify } = await import("../src/cli-runner.js");
+const { runPersonify, DEFAULT_TIMEOUT_MS } =
+  await import("../src/cli-runner.js");
 
 function makeFakeChild() {
   const child = new EventEmitter() as ChildProcess & {
@@ -184,5 +185,41 @@ describe("runPersonify", () => {
       error: 'no OAuth token found at /fake/token. Run "claude setup-token"...',
     });
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("runPersonify modes", () => {
+  beforeEach(() => {
+    spawnMock.mockReset();
+    loadOAuthTokenMock.mockReset();
+    loadOAuthTokenMock.mockResolvedValue({ ok: true, token: "t" });
+  });
+
+  it("passes the show-both instruction when mode is both", async () => {
+    const child = makeFakeChild();
+    spawnMock.mockReturnValue(child);
+    const promise = runPersonify("hello", { mode: "both" });
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+    child.stdout.emit("data", Buffer.from("out"));
+    child.emit("close", 0);
+    await promise;
+    const args = spawnMock.mock.calls[0][1] as string[];
+    expect(args.join(" ")).toContain("show both");
+  });
+
+  it("omits the show-both instruction by default", async () => {
+    const child = makeFakeChild();
+    spawnMock.mockReturnValue(child);
+    const promise = runPersonify("hello");
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+    child.stdout.emit("data", Buffer.from("out"));
+    child.emit("close", 0);
+    await promise;
+    const args = spawnMock.mock.calls[0][1] as string[];
+    expect(args.join(" ")).not.toContain("show both");
+  });
+
+  it("allows more than 30s, since two arms plus review exceed it", async () => {
+    expect(DEFAULT_TIMEOUT_MS).toBeGreaterThanOrEqual(120_000);
   });
 });

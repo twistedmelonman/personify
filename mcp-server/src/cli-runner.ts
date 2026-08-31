@@ -12,11 +12,22 @@ export const PERSONIFY_INSTRUCTION =
   "with the first character of the edited text. No preamble, no commentary, " +
   "no trailing notes, no markdown code fence around it.";
 
-export const DEFAULT_TIMEOUT_MS = 30_000;
+// Two arms plus a blind review, not one rewrite. The old 30s budget was sized
+// for a single pass and times out on nearly every 1.0 invocation.
+export const DEFAULT_TIMEOUT_MS = 180_000;
+
+export const SHOW_BOTH_SUFFIX =
+  " After producing the result, show both arms: the full comparison with " +
+  "context, each arm's reported rules, the A to B diff, and the reviewer " +
+  "verdict.";
 
 export async function runPersonify(
   text: string,
-  opts: { timeoutMs?: number; tokenPath?: string } = {},
+  opts: {
+    timeoutMs?: number;
+    tokenPath?: string;
+    mode?: "default" | "both";
+  } = {},
 ): Promise<CliResult> {
   if (text.trim().length === 0) {
     return { ok: false, error: "no text provided" };
@@ -30,9 +41,13 @@ export async function runPersonify(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return new Promise((resolve) => {
+    const instruction =
+      opts.mode === "both"
+        ? PERSONIFY_INSTRUCTION + SHOW_BOTH_SUFFIX
+        : PERSONIFY_INSTRUCTION;
     const child = spawn(
       "claude",
-      ["--print", "--permission-mode", "auto", PERSONIFY_INSTRUCTION],
+      ["--print", "--permission-mode", "auto", instruction],
       {
         shell: false,
         stdio: ["pipe", "pipe", "pipe"],
