@@ -10,7 +10,7 @@ Target shape, not a string to diff against:
 Roughly 65 words against the original's 200, with every fact intact.
 
 On the metrics clause: the input lists four things built, and metrics is one
-of them, so it cannot be dropped (Process step 3). It survives as what the
+of them, so it cannot be dropped (never invent facts: `rules/hard.md`, rule 3). It survives as what the
 metrics let a reader do, not as "wired up metrics collection," because a
 component inventory is exactly what group Z removes. An earlier version of
 this target dropped the fact while claiming every fact was intact; that was a

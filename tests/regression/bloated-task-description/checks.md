@@ -43,7 +43,7 @@ step 3.
 - [ ] The open question is owned in the first person: "I don't know yet,"
       not "the specifics have yet to be fully determined."
 
-## Facts that must survive (Process step 3)
+## Facts that must survive (never invent facts: `rules/hard.md`, rule 3)
 
 - [ ] No managed database, deliberately, because this is trial-scoped.
 - [ ] Flat-file index.
