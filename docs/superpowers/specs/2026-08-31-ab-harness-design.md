@@ -154,9 +154,8 @@ line:
 
     [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
 
-Full comparison appears on request (`show both`, `--ab`), or automatically when
-the reviewer reports low confidence, or the arms differ on more than a third of
-their spans:
+Full comparison appears on request, or automatically when the reviewer reports
+low confidence, or the arms differ on more than a third of their spans:
 
     CONTEXT  surface: PR review comment · audience: teammate, familiar
              thread: 4 prior comments, disagreement about retry logic
@@ -177,6 +176,30 @@ their spans:
 
 The diff shown is A to B, not original to final. The per-stage question is the
 one `calibrate-register` was built to answer and could not.
+
+### Asking for the comparison after the fact
+
+`show both` is not a submit-time flag. Both arms have already run and both are
+recorded before any output is shown, so the request is served by reading the
+record, never by re-running. The user can ask at submission, immediately after
+seeing the result, or later in the session, and the output is identical in all
+three cases.
+
+This is the reason the recorder writes before the result is displayed rather
+than after, and the reason the status line carries the record timestamp: the
+timestamp is how a past run is named.
+
+Three ways to ask, all reading the same record:
+
+- `show both`, immediately after a result. Refers to the most recent run.
+- `show both 2026-08-31T09-14-22`, naming a timestamp from any earlier status
+  line, including one from a previous session.
+- `--ab` at submission, which only suppresses the quiet default for that run.
+  It changes what is displayed, not what is computed.
+
+A record whose file has been deleted is reported as unavailable. The skill does
+not silently re-run to reconstruct it, because a re-run produces different text
+and would be presented as though it were the original comparison.
 
 ## Consolidation
 
