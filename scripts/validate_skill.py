@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL_PATH = ROOT / "SKILL.md"
+TAXONOMY_PATH = ROOT / "rules" / "taxonomy.md"
 
 
 def fail(message: str) -> None:
@@ -40,9 +41,13 @@ def main() -> None:
             key = nonportable_key[:-1]
             fail(f"Remove nonportable frontmatter key: {key}")
 
-    heading_letters = re.findall(r"(?m)^### ([A-Z])\. ", text)
+    if not TAXONOMY_PATH.exists():
+        fail("rules/taxonomy.md not found")
+    taxonomy = TAXONOMY_PATH.read_text(encoding="utf-8")
+
+    heading_letters = re.findall(r"(?m)^### ([A-Z])\. ", taxonomy)
     if not heading_letters:
-        fail("No pattern-group headings found (expected '### A. ...' style)")
+        fail("No pattern-group headings found in rules/taxonomy.md")
 
     expected = list(string.ascii_uppercase[: len(heading_letters)])
     if heading_letters != expected:
@@ -50,6 +55,9 @@ def main() -> None:
             "Pattern-group headings must run A, B, C... with no gaps "
             f"or repeats; found {heading_letters}"
         )
+
+    if re.search(r"(?m)^### [A-Z]\. ", text):
+        fail("Pattern groups must live in rules/taxonomy.md, not SKILL.md")
 
     first, last = heading_letters[0], heading_letters[-1]
     count = len(heading_letters)
