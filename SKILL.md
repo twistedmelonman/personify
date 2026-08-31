@@ -101,8 +101,17 @@ reports go into the evidence record, which the reviewer does not read.
 
 Write the run to `~/.claude/personify-evidence/YYYY-MM-DDTHH-MM-SS.md` before
 displaying output. Create that directory if it does not exist. The time uses
-hyphens rather than colons because a colon is not portable in a filename. The record is what `show both` reads later, so it must exist by the
-time the user sees the result.
+hyphens rather than colons because a colon is not portable in a filename.
+
+`docs/evidence-format.md` defines what goes in the file and is required
+reading before writing one. In short: YAML frontmatter carrying the fields
+consolidation counts, then five verbatim sections holding the input, each arm's
+output, the reviewer's four lines, and the user's own text when it is captured.
+Record `arm_a_label`, which says whether the reviewer saw arm A as candidate 1
+or 2, because without it a winning label cannot be traced back to an arm.
+
+The record is what `show both` reads later, so it must exist by the time the
+user sees the result.
 
 ### 5. Show the quiet default
 
@@ -151,11 +160,14 @@ A to arm B, and the reviewer's verdict with the shared residue it named.
 The diff runs from arm A to arm B, not from the original to the result. Which
 arm changed what is the question this whole comparison exists to answer.
 
-When unconsolidated records reach 25, append to that same line:
+When unconsolidated records reach 25, and again at every later multiple of 25,
+append to that same line:
 
     · 25 unconsolidated, /personify:personify-consolidate
 
-Never as separate output, never as a question.
+Never as separate output, never as a question. It repeats because the count
+only resets when consolidation actually runs, so an ignored nudge means the
+evidence is still waiting, not that it stopped mattering.
 
 ### 6. Serve later requests from the record
 
