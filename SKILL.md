@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 0.6.0
+version: 1.0.0
 description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards and PR comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -19,7 +19,7 @@ Before applying anything below, you MUST actually check disk for the voice guide
 
 Never state that a voice guide is "missing," "not configured," or "not found" without having just run a tool call against that exact path in this turn. If you have not made that call yet, make it before saying anything about voice-guide status.
 
-If a voice guide is found, read it fully and treat it as authoritative. It describes one specific person's writing. Where it conflicts with any rule in this skill, the voice guide wins; the pattern groups below are only a backstop for residue it doesn't address.
+If a voice guide is found, read it fully and treat it as authoritative. It describes one specific person's writing. Where it conflicts with any rule in this skill, the voice guide wins; the pattern groups in `rules/taxonomy.md` and the hard rules in `rules/hard.md` are only a backstop for residue it doesn't address.
 
 If no voice guide is found, read `VOICE.example.md` (in this skill's directory) for what one looks like and how to build it. Without a voice guide this skill makes text non-robotic but not distinctive: clean, competent, anonymous. Proceed with the general rules and say so, so the user knows a voice guide is what turns "not obviously AI" into "sounds like them."
 
@@ -27,12 +27,88 @@ The voice guide is personal and never committed (git-ignored, like `.env`). It l
 
 ## Process
 
-1. Scan for the patterns below.
-2. Rewrite, don't delete: cover every fact the original covers, don't compress it into bullet-point paraphrase. This constrains what you cut, not how short you get: step 4 compresses hard, and the two agree because hedges and throat-clearing are not facts.
-3. Preserve the specifics: names, numbers, concrete details. Never invent facts, dates, or examples that weren't in the source.
-4. De-abstract, then compress. Two passes, in this order, and they matter more than anything else in this file for work communication. First: every sentence describing a judgment or an action, who did it (group W)? Put them in the sentence. Do this first, because compressing "it was decided that we should revisit the cache" can delete the clause that would have told you who decided. Second: every sentence, is the idea smaller than the word count (group V)? Cut until it isn't. Naming the actor usually makes the sentence shorter anyway.
-5. Self-audit: "what in this rewrite would still tag as obviously AI-generated?" Then, for work communication: "would I actually type this to a coworker, or is it a memo?" and "how many words is this carrying that do no work?" For GitHub PR descriptions and review comments specifically, also ask: "would a teammate skimming this diff have written a header here?" and "am I explaining what I didn't do, when nobody asked?" Fix those, then output.
-6. No em dashes or en dashes in the final text: hard rule, not a preference. Replace with a period, comma, or colon. Not parentheses (group O).
+Step 0 above still runs first. The voice guide reaches both arms.
+
+### 1. Probe the context
+
+Determine four things before rewriting anything. Infer first. Ask only when a
+wrong answer would change the output.
+
+- Surface. A PR URL means a PR comment. A repo with a branch and a diff means a
+  PR description. Headers and length suggest a document. Ask only when two
+  surfaces with different registers are equally likely.
+- Audience. Own repo means a familiar teammate, which is the default. A public
+  repo issue reply means a stranger. The voice guide may name recurring people.
+  Ask only when the text addresses someone by name you have no read on.
+- Thread. Run `gh pr view --comments` or `gh issue view --comments` when a URL
+  or number is present. Never ask. If it is unavailable, record it as absent
+  and continue.
+- Project. Read the working directory, its CLAUDE.md, and its README. Never ask.
+
+Record every inferred value, and mark assumed ones as assumed. A recorded wrong
+assumption is better than a question that makes this tool annoying enough to
+stop using.
+
+These `gh` calls are read-only. Never post, comment, or modify.
+
+### 2. Run both arms on the same text
+
+Arm A reads `rules/taxonomy.md` and `rules/learned.md`. It reports which
+lettered groups it applied.
+
+Arm B reads `rules/hard.md` and `rules/learned.md`. It must not read
+`rules/taxonomy.md`. It reports what it removed in plain description, never by
+letter.
+
+Both receive identical context and the same voice guide. Neither sees the
+other's output.
+
+### 3. Review
+
+Run `reviewer/PROMPT.md` with the context and both candidates, labeled 1 and 2,
+without saying which arm produced which. Assign the labels randomly per run, so
+position carries no information.
+
+Send the reviewer the two rewritten texts and the context. Nothing else. In
+particular, do NOT send it either arm's report of what it applied: arm A
+reports lettered groups such as "V, W, Z" and arm B reports plain descriptions,
+so those reports identify the arms on sight and defeat the randomization. The
+reports go into the evidence record, which the reviewer does not read.
+
+### 4. Record before showing anything
+
+Write the run to `~/.claude/personify-evidence/<ISO8601>.md` before displaying
+output. The record is what `show both` reads later, so it must exist by the
+time the user sees the result.
+
+### 5. Show the quiet default
+
+Output the winning text, then one line:
+
+    [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
+
+Show the full comparison instead when the user asked for it, when the reviewer
+reported low confidence, or when the arms differ on more than a third of their
+spans.
+
+When unconsolidated records reach 25, append to that same line:
+
+    · 25 unconsolidated, /personify-consolidate
+
+Never as separate output, never as a question.
+
+### 6. Serve later requests from the record
+
+`show both` reads the record. It never re-runs the arms. It works right after a
+result, later in the session, and in a future session when given a timestamp.
+If the record file is gone, say it is unavailable. Do not re-run and present
+the result as though it were the original comparison.
+
+## Pattern groups
+
+The lettered pattern groups A through Z live in `rules/taxonomy.md`. Arm A
+reads them. Every reference to a group letter in this file resolves to that
+file.
 
 ## What NOT to flag
 
@@ -76,7 +152,7 @@ The two axes are audience and length, and they come apart. A company blog post i
 
 The premise: a careful writer's natural work register is polished, complete, evenly hedged, and impersonal, and that register is now indistinguishable from model output. Grammatical polish is not the goal here. Sounding like a specific tired person typing between meetings is the goal. Bias hard toward informal and short. When a rewrite feels too blunt or too casual, it is probably right.
 
-Compression removes words. It never adds specificity. This is the failure mode of everything above: rewriting toward how you'd say it out loud pulls hard toward concrete mechanism, and concrete mechanism is often exactly what the source didn't have. "the invalidation logic may be the source of the stale reads" compresses to "cache invalidation was the cause," not to "cache invalidation was dropping the wrong keys." The second is punchier, sounds more human, and asserts something nobody established. If the vague version is what you know, ship the vague version short (Process, step 3).
+Compression removes words. It never adds specificity. This is the failure mode of everything above: rewriting toward how you'd say it out loud pulls hard toward concrete mechanism, and concrete mechanism is often exactly what the source didn't have. "the invalidation logic may be the source of the stale reads" compresses to "cache invalidation was the cause," not to "cache invalidation was dropping the wrong keys." The second is punchier, sounds more human, and asserts something nobody established. If the vague version is what you know, ship the vague version short (never invent facts: `rules/hard.md`, rule 3).
 
 Write for a reader with no context. This is the rule that cuts hardest against the instinct to make a permanent record precise and technical. Task boards, milestones, and status updates get read by people who were not in the conversation, do not know the codebase, and are deciding whether the work was worth funding. Precision aimed at a peer reads as opacity to them, and opacity reads as either padding or as text nobody thought about. Assume the reader knows the goal and nothing about the implementation. Group Z is the pattern this produces when it goes wrong.
 
@@ -101,7 +177,7 @@ Defaults, which override the general guidance elsewhere in this skill:
 - Use a list when the content is genuinely a list (steps, findings, changes). Don't force prose into a list, or a list into prose.
 - Skip the greeting and the sign-off in short internal messages. Start with the content.
 
-What survives compression, and this is not negotiable: names, numbers, file paths, error text, technical caveats, and anything a reader would act on. What gets cut: hedges, qualifiers, restatements, throat-clearing, defensive completeness, and softening. Losing nuance is acceptable here. Losing a fact is not (Process, step 3).
+What survives compression, and this is not negotiable: names, numbers, file paths, error text, technical caveats, and anything a reader would act on. What gets cut: hedges, qualifiers, restatements, throat-clearing, defensive completeness, and softening. Losing nuance is acceptable here. Losing a fact is not (never invent facts: `rules/hard.md`, rule 3).
 
 Worked example, a status update:
 
@@ -125,7 +201,7 @@ Even here, cut words, not content. Keep every fact, caveat, and detail the origi
 
 ## GitHub PR descriptions and review comments
 
-A specific failure mode within technical content: unearned structure and defensive completeness, rather than flowery prose. None of the pattern groups above catch it, because the sentences themselves can be plain. What reads as AI-generated here is ceremony: headers a one-line change doesn't need, and a rundown of tests that don't apply that nobody asked about.
+A specific failure mode within technical content: unearned structure and defensive completeness, rather than flowery prose. None of the pattern groups in `rules/taxonomy.md` catch it, because the sentences themselves can be plain. What reads as AI-generated here is ceremony: headers a one-line change doesn't need, and a rundown of tests that don't apply that nobody asked about.
 
 - **Size the description to the diff.** A one-line, self-explanatory change gets a one-line description. Headers ("Summary," "Testing," "Impact") are earned by a PR that actually spans multiple files or concerns and needs navigation, not a default template.
 - **State what and why. Never how.** The diff is the how. If the description restates what the code already shows, cut it.
