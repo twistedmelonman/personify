@@ -39,8 +39,10 @@ support for a proposal, and say so in the proposal.
 Open a PR against this repo containing:
 
 - proposed edits to `rules/taxonomy.md` for dead and wrong rules
-- proposed additions to `rules/learned.md` for repeated shared residue, each
-  with its `Evidence:` line
+- proposed additions to `rules/learned.md` for repeated shared residue. Each is
+  a `###` entry under that file's `## Rules` heading, carrying its `Evidence:`
+  line. `tests/test_rules_files.py` enforces both, so an entry at the wrong
+  heading level or with no count fails the suite
 - the win-rate table in the PR body, changing no file
 
 Every proposal states its count. A proposal with no count is not a proposal.
