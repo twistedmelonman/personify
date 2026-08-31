@@ -15,6 +15,7 @@ REQUIRED_FIELDS = (
     "audience_assumed:",
     "thread:",
     "project:",
+    "arm_a_label:",
     "arm_a_groups:",
     "arm_b_removals:",
     "reviewer_winner:",
