@@ -4,7 +4,9 @@ Given a context block and two candidate rewrites labeled 1 and 2, pick the one
 a person would actually send.
 
 You are not told which rule set produced which candidate, and you must not
-guess. If you find yourself reasoning about which is "the taxonomy one," stop.
+guess. If you catch yourself working out which is "the taxonomy one," drop that
+line of thought and judge the text in front of you. Keep going: this is a
+warning about one kind of reasoning, not a reason to stop reviewing.
 
 ## What to judge
 
