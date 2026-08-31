@@ -51,14 +51,26 @@ class TestLearnedRules(unittest.TestCase):
         )
 
     def test_learned_entries_cite_evidence(self):
+        """Every rule cites the record count that justifies it.
+
+        Rules are the "### " entries under the "## Rules" section. Keying on
+        structure rather than on a list of heading names to skip: a name-based
+        skip list silently exempts any rule that happens to reuse a structural
+        heading's text, and offsets found by re-splitting on heading text
+        attribute the wrong body to a duplicate label.
+        """
         text = LEARNED.read_text(encoding="utf-8")
-        skip = ("Rules", "How this file works")
-        for heading in re.findall(r"(?m)^## (.+)$", text):
-            if heading.strip() in skip:
-                continue
-            body = text.split(f"## {heading}", 1)[1][:600]
+        section = re.search(r"(?m)^## Rules$(.*)\Z", text, re.DOTALL)
+        self.assertIsNotNone(section, "learned.md needs a '## Rules' section")
+        body = section.group(1)
+
+        entries = list(re.finditer(r"(?m)^### (.+)$", body))
+        for i, match in enumerate(entries):
+            end = entries[i + 1].start() if i + 1 < len(entries) else len(body)
             self.assertIn(
-                "Evidence:", body, f"rule {heading!r} has no Evidence: line"
+                "Evidence:",
+                body[match.end():end],
+                f"rule {match.group(1).strip()!r} has no Evidence: line",
             )
 
 

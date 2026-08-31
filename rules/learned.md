@@ -11,13 +11,14 @@ PR, and only an approved PR adds one.
 Every rule states the tell, the fix, and the evidence that produced it, in this
 shape:
 
-    ## Short label
+    ### Short label
     The tell, in one or two sentences.
     Fix: what to do instead.
     Evidence: N records, first seen YYYY-MM-DD, user cut it by hand M times.
 
-A rule with no `Evidence:` line is invalid. The count is what separates a real
-rule from one person's judgment on one afternoon.
+Every rule is a `###` entry under `## Rules`. A rule with no `Evidence:` line
+is invalid. The count is what separates a real rule from one person's judgment
+on one afternoon.
 
 ## Rules
 
