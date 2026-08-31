@@ -94,6 +94,14 @@ time the user sees the result.
 
 ### 5. Show the quiet default
 
+The primary arm is whichever one the reviewer picked. Output that arm's text.
+On a tie, output arm A's text and name arm A as primary, so the default favors
+the rule set that is already in use and a tie never silently advances the new
+one.
+
+Name the primary arm in the status line by the letter it actually was, not by
+copying the example below.
+
 Output the winning text, then one line:
 
     [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
