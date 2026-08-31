@@ -24,6 +24,7 @@ text sections it reads only when a human is looking.
     audience_assumed: true
     thread: 4 prior comments
     project: personify
+    arm_a_label: 1
     arm_a_groups: [V, W, Z]
     arm_b_removals: ["two hedges", "a header nobody asked for", "leverage"]
     reviewer_winner: b
@@ -52,6 +53,30 @@ text sections it reads only when a human is looking.
 
     <the user's own text, when captured; omitted otherwise>
 
+## Empty values and ties
+
+A parser needs one answer per case, so these are fixed rather than left to
+whoever writes the recorder.
+
+`arm_a_label` is 1 or 2, whichever label the reviewer saw for arm A. Arm B has
+the other one. The reviewer reports a winning label, not a winning arm, and the
+assignment is a coin flip per run, so without this field `reviewer_winner`
+cannot be derived at all.
+
+`reviewer_winner` is `a`, `b`, or `tie`, already resolved through
+`arm_a_label`. Store the arm, never the label the reviewer said.
+
+`shared_residue` is always a list. No residue is `[]`, never the string
+`"none"` and never an omitted key, even though the reviewer writes `none` in
+its own output. The recorder translates.
+
+`arm_a_groups` and `arm_b_removals` are always lists. An arm that changed
+nothing gets `[]`.
+
+Every frontmatter key above is always present. A field that does not apply
+carries its empty value, and a missing key means a malformed record rather
+than an absent value.
+
 ## Field notes
 
 `audience_assumed` records that the probe guessed. Consolidation weights an
@@ -61,6 +86,11 @@ look bad.
 `arm_a_groups` is the list of lettered groups arm A reported applying. A group
 that never appears across the record set is a dead rule, which is the only
 signal that makes the taxonomy smaller.
+
+The reviewer's `WHY:` line has no frontmatter field on purpose. All four
+reviewer lines are stored verbatim under `## Reviewer`, and a parser reads WHY
+from there by matching the line that starts with `WHY:`. Duplicating it as a
+field would let the two copies disagree.
 
 `shared_residue` is what the reviewer said both arms missed. Repeated entries
 are the only source of new rules.
