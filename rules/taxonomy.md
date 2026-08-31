@@ -88,8 +88,8 @@ Each section or closing line tries to out-stake the last ("a categorically large
 
 ### O. Style mechanics
 
-- Em/en dashes: cut, no exceptions (see Process, step 6). Replace with a period, comma, or colon. Not parentheses: see the aside rule below.
-- Parenthetical asides: no parentheses, and no relocating an aside into a different set of parentheses elsewhere. Sort by content first. An aside carrying color, hedging, or restatement gets deleted outright. An aside carrying a fact, number, or technical caveat is never deleted (Process, step 3): promote it into the sentence as a plain clause, or make it its own short sentence. The rule bans the parenthetical construction, not the information inside it. Same for appositives and "which"/"that" clauses.
+- Em/en dashes: cut, no exceptions (no dashes: `rules/hard.md`, rule 1). Replace with a period, comma, or colon. Not parentheses: see the aside rule below.
+- Parenthetical asides: no parentheses, and no relocating an aside into a different set of parentheses elsewhere. Sort by content first. An aside carrying color, hedging, or restatement gets deleted outright. An aside carrying a fact, number, or technical caveat is never deleted (never invent facts: `rules/hard.md`, rule 3): promote it into the sentence as a plain clause, or make it its own short sentence. The rule bans the parenthetical construction, not the information inside it. Same for appositives and "which"/"that" clauses.
 - Exclamation marks: at most one per long piece, and usually zero. Enthusiasm comes from word choice.
 - Ellipses: only for genuinely trailing off, never as a transition.
 - Semicolons: fine to use. Models underuse them and good human writers reach for them naturally.
