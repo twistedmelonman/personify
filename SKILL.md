@@ -53,6 +53,13 @@ These `gh` calls are read-only. Never post, comment, or modify.
 
 ### 2. Run both arms on the same text
 
+Every `rules/` and `reviewer/` path in this file is relative to this skill's
+own directory, the one holding this SKILL.md, never to the user's working
+directory. The plugin installs into a version-pinned directory, and the text
+being edited usually lives in some other repo entirely, so resolving these
+against the working directory looks for rule files in the user's project and
+finds nothing.
+
 Arm A reads `rules/taxonomy.md` and `rules/learned.md`. It reports which
 lettered groups it applied.
 
@@ -77,8 +84,12 @@ not the other arm's output.
 ### 3. Review
 
 Run `reviewer/PROMPT.md` with the context and both candidates, labeled 1 and 2,
-without saying which arm produced which. Assign the labels randomly per run, so
-position carries no information.
+without saying which arm produced which. Assign the labels by a real coin flip,
+not by choosing: run `python3 -c "import secrets; print(secrets.randbelow(2))"`
+and give arm A label 1 when it prints 0, label 2 when it prints 1. A model
+asked to "pick randomly" settles into a fixed assignment, which is the position
+bias this is meant to remove. Record which arm got which label in the evidence
+record.
 
 Send the reviewer the two rewritten texts and the context. Nothing else. In
 particular, do NOT send it either arm's report of what it applied: arm A
@@ -108,7 +119,12 @@ Output the winning text, then one line:
 
 Show the full comparison instead when the user asked for it, when the reviewer
 reported low confidence, or when the arms differ on more than a third of their
-spans.
+spans. A span here is a sentence: split each arm's output on sentence
+boundaries, and count a sentence as differing when it is not character-for-
+character identical to the sentence at the same position in the other arm's
+output. When the two outputs have different sentence counts, use the longer
+count as the denominator, since a dropped or added sentence is itself a
+difference.
 
 When unconsolidated records reach 25, append to that same line:
 
