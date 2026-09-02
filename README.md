@@ -84,6 +84,16 @@ cp VOICE.example.md ~/.config/personify/VOICE.md   # then edit, or have an agent
 
 Don't keep your real `VOICE.md` inside the installed plugin directory: plugins install into a version-pinned path that is replaced on every upgrade, so a guide kept there is lost the next time the plugin updates.
 
+**If you also have this repo checked out,** symlink instead of copying. Step 0 takes the first path that exists, so a config copy shadows the repo one: you edit `VOICE.md` in the checkout, the skill keeps loading the config copy, and the edits never take effect. A symlink gives you one file at both paths.
+
+```bash
+ln -sf "$PWD/VOICE.md" ~/.config/personify/VOICE.md
+```
+
+To check which file is actually live: `ls -l ~/.config/personify/VOICE.md`.
+
+Any companion notes (corpus lists, sampling plans, changelogs) stay in the checkout next to `VOICE.md` and are git-ignored alongside it. Step 0 reads only `VOICE.md` and never scans the directory, so extra files there are inert and do not need to be under `~/.config/personify/`.
+
 ## Works with pr-review and dumbify
 
 Personify is the middle of three sibling skills that compose into one path from
