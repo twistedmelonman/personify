@@ -3,3 +3,4 @@ __pycache__/
 
 # Personal voice guide (like .env, never committed); see VOICE.example.md
 VOICE.md
+VOICE.corpus.md

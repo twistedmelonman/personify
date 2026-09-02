@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 1.0.0
+version: 1.0.1
 description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards and PR comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -16,6 +16,8 @@ Before applying anything below, you MUST actually check disk for the voice guide
 1. The path in the `PERSONIFY_VOICE` environment variable, if set.
 2. `VOICE.md` under the user's config directory: `$XDG_CONFIG_HOME/personify/VOICE.md`, or `~/.config/personify/VOICE.md` when `XDG_CONFIG_HOME` is unset.
 3. `VOICE.md` in this skill's own directory (repo-local development only).
+
+Read only the first hit; do not merge two guides. If a guide exists at both 2 and 3, the config copy wins and the skill-directory copy is dead weight that will drift. Tell the user, naming both paths and suggesting a symlink, since silent staleness is the usual outcome: edits land in the repo copy while this skill keeps loading the config one.
 
 Never state that a voice guide is "missing," "not configured," or "not found" without having just run a tool call against that exact path in this turn. If you have not made that call yet, make it before saying anything about voice-guide status.
 

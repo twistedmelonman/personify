@@ -1,6 +1,6 @@
 # Voice Guide (example / template)
 
-This is the committed example. The real file lives next to it as `VOICE.md` and is git-ignored, exactly like `.env` versus `.env.example`. Copy this to `VOICE.md` and fill it in with one specific person's voice, or point an agent at a corpus and have it build `VOICE.md` from the instructions below.
+This is the committed example. The real file is `VOICE.md`, git-ignored exactly like `.env` versus `.env.example`. Copy this to `VOICE.md` and fill it in with one specific person's voice, or point an agent at a corpus and have it build `VOICE.md` from the instructions below. It belongs at `~/.config/personify/VOICE.md`, not beside this file; see the next section for why, and for the symlink to use if you have the repo checked out.
 
 ## Why this exists
 
@@ -9,6 +9,8 @@ Personify strips the statistical fingerprints of LLM writing. On its own, that m
 ## How Personify uses it
 
 Personify's Step 0 checks three locations in order: the path in `PERSONIFY_VOICE` if that variable is set, then `VOICE.md` under your config directory (`$XDG_CONFIG_HOME/personify/VOICE.md`, or `~/.config/personify/VOICE.md`), then this skill's own directory, which is for repo-local development only. Put your real `VOICE.md` in the config directory: the plugin install is version-pinned and gets replaced on every upgrade, so a guide kept inside it disappears when you update. If a guide is found, Personify reads it and treats it as authoritative: where the general pattern list and the voice guide disagree, the voice guide wins, and the pattern list becomes a backstop for residue. If `VOICE.md` is absent, Personify falls back to generic cleanup and points here.
+
+**First match wins, which matters if you have the repo checked out.** A `VOICE.md` in the config directory shadows one in the skill directory. Two copies means editing the repo file and having Step 0 keep reading the config copy, with no error and no sign anything is wrong. Symlink rather than copy: `ln -sf "$PWD/VOICE.md" ~/.config/personify/VOICE.md`. Verify with `ls -l ~/.config/personify/VOICE.md`. Step 0 opens `VOICE.md` by exact name and never lists the directory, so companion files (corpus notes, sampling plans) can sit next to whichever copy is real without affecting anything.
 
 ## How to build a `VOICE.md`
 
