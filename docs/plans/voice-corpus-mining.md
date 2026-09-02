@@ -2,14 +2,19 @@
 
 **Status:** proposed, not started
 **Written:** 2026-08-14
+**Revised:** 2026-09-02, for `VOICE.md` v0.3
 
 ## Why
 
-`VOICE.md` v0.2 is derived from one recent blog corpus. It describes the published voice well and the work voice barely at all, which is the gap that produced a wrong inference: the guide's Conflicts section told Personify to preserve em dashes and complete-sentence fastidiousness at work, which is precisely the register drawing manager warnings.
+`VOICE.md` is derived from one recent blog corpus. It describes the published voice well and the work voice from a single feedback conversation, which is thin ground for the register that carries the most risk.
 
-There is a second, larger reason. The register in question is roughly 30 years old. Andrew wrote in complete sentences with dependent clauses and correct punctuation on Usenet from about 1995 and on Slashdot in the early 2000s, decades before any language model existed. A corpus spanning that range turns "this is how he writes" from an inference off six blog posts into something demonstrable, and it settles the question of whether the flagged register is his or an artifact.
+That gap has already produced one wrong inference. Before v0.2, the Conflicts section told Personify to preserve em dashes and complete-sentence fastidiousness at work, which is precisely the register drawing manager warnings. The Feedback received overrides fixed it, but they rest on one conversation rather than on evidence of how the work register actually reads across time.
 
-The immediate work register fixes do not depend on this. `VOICE.md` v0.2 already produces what the feedback asked for. This is the durable version.
+There is a second, larger reason. The register in question is roughly 30 years old. Andrew wrote in complete sentences with dependent clauses and correct punctuation on Usenet from about 1995 and on Slashdot in the early 2000s, decades before any language model existed. v0.3 states this in Feedback received, under "What this is and is not," but states it as an assertion. A corpus spanning that range turns it into something demonstrable.
+
+The immediate work register fixes do not depend on this. The current guide already produces what the feedback asked for. This is the durable version.
+
+**What v0.3 added that this plan predates.** The "Where the voice comes from" section came from Andrew directly on 2026-09-02, not from any corpus, and it explains why several fingerprint items are what they are. Corpus analysis must not overwrite it: a corpus can show that a trait appears in the writing, and cannot show why. Treat that section as fixed input, and use the corpus to test whether the traits it names are visible across 30 years.
 
 ## Sources, ranked by value per unit of effort
 
@@ -69,6 +74,8 @@ Weight the sample toward:
 - Work mail specifically, since that is the register the current guide is weakest on
 - Spread across the full time range, to test whether the register actually is stable across 30 years
 
+v0.3 gives the analysis two concrete questions to answer rather than an open brief. First, are the five traits in "Where the voice comes from" visible in 2004 mail as well as 2026 mail, or did some of them arrive later? Second, does the placement rule in fingerprint item 1a hold historically: do qualifications sit in the same sentence as the claims they limit, or is that a recent habit? Both are checkable against dated samples, and both are currently asserted from a handful of 2026 examples.
+
 ### Step 4: analyze
 
 This is the only stage that needs a model, and it runs over a few hundred sampled messages rather than the whole archive.
@@ -82,9 +89,14 @@ Whatever runs it, the analysis should produce the sections `VOICE.example.md` al
 
 ### Step 5: merge into VOICE.md
 
-Merge rather than replace. `VOICE.md` v0.2's Feedback received section is real manager feedback and outranks anything derived from a corpus. The corpus work updates the fingerprint and the register notes, and adds a provenance section establishing the register's age.
+Merge rather than replace. Two sections in the current guide outrank anything a corpus produces, for different reasons:
 
-Version the result v0.3 and note in Corpus what was sampled and what was not.
+- **Feedback received** is real manager feedback about how the writing lands. A corpus shows how Andrew writes, not how a reader reacts.
+- **Where the voice comes from** is Andrew's own account of the traits underneath the style. A corpus can confirm a trait shows up in the text; it cannot derive the reason. Do not rewrite this section from corpus evidence.
+
+The corpus work updates the fingerprint and the register notes, and turns the provenance claim in "What this is and is not" from an assertion into something backed by dated samples.
+
+Version the result v0.4; v0.3 is the 2026-09-02 revision. Record what was sampled and what was not in `VOICE.corpus.md`, which holds provenance and sampling notes and is deliberately kept out of `VOICE.md` so it does not consume context on every skill invocation. It is git-ignored alongside `VOICE.md`.
 
 ## Cost and sequencing notes
 
@@ -94,10 +106,10 @@ Sequencing: request Takeout first since it has the longest lead time, run filter
 
 ## Privacy constraints
 
-- `VOICE.md` is git-ignored and stays that way. It already contains a named manager and employer specifics.
+- `VOICE.md` is git-ignored and stays that way. It contains a named manager, employer specifics, and, as of v0.3, health information. `VOICE.corpus.md` is git-ignored on the same grounds.
 - The corpus itself is never committed anywhere.
 - Prefer local inference. If a hosted model is used, the filtering in step 2 is what limits exposure, so it runs first and gets verified before anything is sent.
-- Political positions stay out of stored notes, matching the existing constraint in the Corpus section on ballot posts.
+- Political positions stay out of stored notes, matching the existing constraint on ballot posts in `VOICE.corpus.md`.
 
 ## What this does not change
 
