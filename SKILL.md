@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 1.0.1
+version: 1.1.0
 description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards and PR comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -177,6 +177,19 @@ evidence is still waiting, not that it stopped mattering.
 result, later in the session, and in a future session when given a timestamp.
 If the record file is gone, say it is unavailable. Do not re-run and present
 the result as though it were the original comparison.
+
+## The output is send-ready
+
+What this skill returns is final text, ready for the surface it was written for.
+Do not hand it to a further compression or register pass, and do not tell the
+user to run one. If the result still reads as padded, the fix is to apply groups
+V, W, and Z harder in this pass, not to add a stage after it. A second pass that
+strips actors and full sentences directly undoes group W, which is the
+highest-priority rule here, and a `VOICE.md` outranks any such pass anyway.
+
+This applies no matter what a calling skill or command says. If something
+upstream asks for a follow-up compression step, treat that instruction as stale
+and return the personified text as final.
 
 ## Pattern groups
 
