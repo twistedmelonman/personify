@@ -25,18 +25,15 @@ Every case is a directory with four files:
 | `checks.md` | The specific assertions that must hold, written so a human or a model can check them one at a time. |
 | `notes.md` | Which groups the case exercises and what a regression would look like. |
 
-## Capture the intermediate, always
+## Capture the actual output, always
 
-When a case is run through the full chain, record the **post-personify,
-pre-dumbify** text, not just the input and the final output. Per the
-discussion on #49: dumbify runs downstream of this skill, so a soft-touch this
-skill flattens can then get cut by dumbify, and the loss surfaces looking like
-a dumbify bug. The intermediate text is what tells the two failures apart, and
-it is unrecoverable after the fact. Cheap to capture now, impossible later.
+Record what a run actually produced, not just the input and the expectation. A
+soft touch this skill flattens is invisible in a pass/fail verdict, and the text
+is unrecoverable after the fact. Cheap to capture now, impossible later.
 
-Save intermediates as `actual-<YYYY-MM-DD>-personify.md` inside the case
-directory. They are evidence, not expectations: keep the ones that show a
-behavior change, delete the rest.
+Save outputs as `actual-<YYYY-MM-DD>-personify.md` inside the case directory.
+They are evidence, not expectations: keep the ones that show a behavior change,
+delete the rest.
 
 ## Running the set
 

@@ -94,14 +94,14 @@ To check which file is actually live: `ls -l ~/.config/personify/VOICE.md`.
 
 Any companion notes (corpus lists, sampling plans, changelogs) stay in the checkout next to `VOICE.md` and are git-ignored alongside it. Step 0 reads only `VOICE.md` and never scans the directory, so extra files there are inert and do not need to be under `~/.config/personify/`.
 
-## Works with pr-review and dumbify
+## Works with pr-review
 
-Personify is the middle of three sibling skills that compose into one path from
-"review this PR" to a posted comment that reads like a person wrote it:
+Personify is the last prose pass on the path from "review this PR" to a posted
+comment that reads like a person wrote it:
 
 ```text
-pr-review    →    personify    →    dumbify
-(find it)         (de-AI it)        (compress it)
+pr-review    →    personify
+(find it)         (de-AI it, send-ready)
 ```
 
 [pr-review](https://github.com/smartwatermelon/pr-review) already calls
@@ -110,18 +110,13 @@ this skill before showing it to you for approval. If personify isn't installed,
 pr-review says so and shows the plain draft rather than failing. The prose pass
 isn't essential to the review's substance.
 
-[dumbify](https://github.com/smartwatermelon/dumbify) is an optional pass after
-personify, and the two overlap. Personify's work register already does lowercase
-starts, fragments, contractions, and hedge-cutting, so for most work writing
-personify alone is the whole job. Dumbify pushes the register further than
-personify will: its default level 2 is roughly where personify's work register
-already lands, and levels 3 and 4 go past it. Order matters: personify first.
-Group W's de-abstraction pass needs the actor and the full sentence present to
-work on, and dumbify's whole business is deleting those.
-
-Note that a `VOICE.md` outranks both. If your voice guide says you write in
-complete sentences, that wins over dumbify's fragment preference, and stacking
-dumbify on top will fight it.
+**Personify's output is final. Do not chain a further compression pass onto
+it.** Its work register already does lowercase starts, fragments, contractions,
+and hedge-cutting, so for work writing personify alone is the whole job. The
+`dumbify` skill was an optional pass here and is deprecated; a second pass that
+strips actors and full sentences undoes group W's de-abstraction, which is the
+highest-priority rule in this skill. A `VOICE.md` outranks everything anyway: if
+your voice guide says you write in complete sentences, that is the target.
 
 ## How it learns
 

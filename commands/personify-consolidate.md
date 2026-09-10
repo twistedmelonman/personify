@@ -60,9 +60,7 @@ their own column, never folded into either arm and never omitted.
 
 This table is what eventually answers whether the taxonomy earns its place, so
 an overstated margin here is the most expensive error in this command. It
-compares `rules/taxonomy.md` against `rules/hard.md`, nothing else. Whether a
-downstream pass such as dumbify is still needed is a conclusion someone draws
-from arm B's output later, not a thing this harness measures.
+compares `rules/taxonomy.md` against `rules/hard.md`, nothing else.
 
 Weight records with `audience_assumed: true` lower when they are the only
 support for a proposal, and say so in the proposal.
