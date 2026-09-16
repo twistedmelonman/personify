@@ -104,6 +104,23 @@ seen later. Capture is opportunistic: the record is amended if the user pastes
 a corrected version, says what they changed, or the posted comment turns up via
 `gh`. No prompt is ever issued to obtain it.
 
+## Retired pattern-group letters
+
+A group that consolidation finds dead is deleted from `rules/taxonomy.md`, and
+its letter retires with it. A retired letter is never reused and the survivors
+are never re-lettered to close the gap. Records key their `arm_a_groups` on
+these letters, so reassigning one would silently rewrite every record already
+written and make the next dead-rule count wrong.
+
+Retired so far:
+
+| Letter | Group | Retired |
+| --- | --- | --- |
+| F | Epistrophe / repetition as gravity | 2026-09-16 |
+| I | Rhetorical question as connective tissue | 2026-09-16 |
+| L | False ranges | 2026-09-16 |
+| M | Vague attribution | 2026-09-16 |
+
 ## The .consolidated marker
 
 `~/.claude/personify-evidence/.consolidated` holds the timestamp of the last

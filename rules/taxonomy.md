@@ -48,10 +48,6 @@ This is a weighted signal and not a default cut. Delete the adverb and read the 
 
 Not just three-item lists ("innovation, inspiration, insight") but three-part *structures*: three-step processes, three examples, three parallel clauses per paragraph, used as the skeleton of an entire piece. If you can't stop finding threes, you're pattern-completing. Vary list length; use two, four, or none.
 
-### F. Epistrophe / repetition as gravity
-
-Repeating a word or clause purely to manufacture weight ("falls, and falls, and falls"; closing on "the biggest X I have ever seen"). No new information, just emphasis through repetition. Cut it; if the content needs the repetition to feel important, the content isn't earning the importance on its own.
-
 ### G. Staccato fragments as punchlines
 
 Long buildup sentence, then a one- or two-word fragment dropped for drama ("That is the story now." "Ubiquity."). A single clipped sentence for emphasis is fine. A run of them in one piece is engineered drama. Use full sentences, or cut the theatrics.
@@ -62,10 +58,6 @@ The text announces its own outline as it goes: "it is worth naming the steps pre
 
 Emotional-arc section headers are the same tell in heading form. Short headers naming a mood or beat rather than a topic ("The weather," "The scream," "The close") turn the piece into a script narrating its own dramatic structure. Fine once as a title. A full set of them running through one piece is self-narration by another route.
 
-### I. Rhetorical question as connective tissue
-
-Posing a question purely to answer it in the next sentence, used repeatedly as the joint between sections rather than genuine inquiry. Fine once. A tell as a recurring transition device.
-
 ### J. False-discovery framing
 
 "It turns out that X" used to dress up an asserted premise as an empirical finding when nothing was tested or discovered. State the claim; don't costume it as a revelation.
@@ -73,14 +65,6 @@ Posing a question purely to answer it in the next sentence, used repeatedly as t
 ### K. Escalating grandiosity
 
 Each section or closing line tries to out-stake the last ("a categorically larger event" -> "the biggest one I have ever seen"). Stakes should come from evidence, not adjectival inflation.
-
-### L. False ranges
-
-"From the Big Bang to dark matter" where the two ends aren't actually on a meaningful scale. List the actual topics instead.
-
-### M. Vague attribution
-
-"Experts believe," "industry reports suggest," "observers have noted" without a named source. Name the source or cut the claim.
 
 ### N. Formulaic "despite challenges" close
 
