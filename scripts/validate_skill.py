@@ -6,7 +6,6 @@ project's release cadence."""
 from __future__ import annotations
 
 import re
-import string
 import sys
 from pathlib import Path
 
@@ -49,11 +48,17 @@ def main() -> None:
     if not heading_letters:
         fail("No pattern-group headings found in rules/taxonomy.md")
 
-    expected = list(string.ascii_uppercase[: len(heading_letters)])
-    if heading_letters != expected:
+    # Letters must ascend and never repeat, but gaps are allowed. Consolidation
+    # deletes a group that fired in no recorded run, and the letter it used
+    # retires with it rather than being reused. Renumbering the survivors would
+    # be worse than the gap: every record in ~/.claude/personify-evidence/ keys
+    # its arm_a_groups on these letters, so a shift silently rewrites the whole
+    # historical corpus and the next consolidation counts against the wrong
+    # groups.
+    if sorted(set(heading_letters)) != heading_letters:
         fail(
-            "Pattern-group headings must run A, B, C... with no gaps "
-            f"or repeats; found {heading_letters}"
+            "Pattern-group headings must ascend A, B, C... with no repeats; "
+            f"gaps from retired groups are allowed. Found {heading_letters}"
         )
 
     if re.search(r"(?m)^### [A-Z]\. ", text):
