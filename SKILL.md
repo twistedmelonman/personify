@@ -428,9 +428,16 @@ Also a universal rule that outranks the voice guide, on the same terms as the PR
 description section above.
 
 The ratio of comment lines to code lines is never more than 1:1, and should be
-far lower. One line per logical block, and only where an informed reading of the
-code by a competent reviewer would not already tell them. No explanations, no
-conversation, no links, and no "because X and Y, then Z, and also, and also."
+far lower. At most one comment per logical block, and only where an informed
+reading of the code by a competent reviewer would not already tell them. No
+explanations, no conversation, no links, and no "because X and Y, then Z, and
+also, and also."
+
+One comment means one, not one physical line: a comment that wraps to a second
+line to stay inside the line limit is still one comment. What the rule forbids
+is a second comment on the same block and a comment that runs to a paragraph.
+If one comment needs three lines to say its thing, the thing is probably two
+facts, and one of them is likely already in the code.
 
 What a comment is for is the thing the code cannot say: why this way rather than
 the obvious way, a constraint that is not visible locally, a workaround and what

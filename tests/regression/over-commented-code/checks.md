@@ -19,7 +19,9 @@ times.
 - [ ] No link survives. The wiki URL is cut.
 - [ ] No comment explains why an obvious thing is obvious ("going to the
       network on every refresh would be slow").
-- [ ] No "because X and Y, then Z" chains. No comment runs past one line.
+- [ ] No "because X and Y, then Z" chains. No comment runs to a paragraph. A
+      single comment wrapping to a second line for line length is a pass; a
+      second comment on the same block is not.
 - [ ] No comment addresses the reader ("we want to avoid that if at all
       possible," "Note that").
 
