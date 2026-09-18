@@ -65,7 +65,7 @@ Personify the writing in docs/launch-post.md
 
 ## What it does
 
-`SKILL.md` covers the standard taxonomy of AI-writing tells (inflated significance, empty vocabulary clusters, copula avoidance, filler and hedging, chatbot residue, and more), plus patterns added after reviewing specific pieces of writing that leaned on AI-adjacent techniques without being AI-written. It also has a dedicated section for GitHub PR descriptions and review comments, where the tell is usually structural (unearned headers, defensive completeness) rather than prose-level. It documents what *not* to flag too, so a clean human writer who hits one of these patterns once isn't treated as a false positive. See the file itself for the full pattern list and provenance notes.
+`SKILL.md` covers the standard taxonomy of AI-writing tells (inflated significance, empty vocabulary clusters, copula avoidance, filler and hedging, chatbot residue, and more), plus patterns added after reviewing specific pieces of writing that leaned on AI-adjacent techniques without being AI-written. It also has dedicated sections for GitHub PR descriptions, PR review comments, and code comments, where the tell is usually structural (unearned headers, defensive completeness, a comment block that narrates the code) rather than prose-level. The PR description and code comment rules are universal: they are the only two rules a personal `VOICE.md` cannot override, because both describe the shape of an artifact rather than how a person writes. It documents what *not* to flag too, so a clean human writer who hits one of these patterns once isn't treated as a false positive. See the file itself for the full pattern list and provenance notes.
 
 ## Voice guide
 

@@ -32,8 +32,9 @@ section heading, where the sentence that follows already carries the point.
 headings. Both arms produce it even when neither the source nor the surface
 register has it. Fix: delete the label or heading and let the first sentence
 do its own work. A correction reads as a correction without being announced.
-VOICE.md line 191 allows bold lead-in labels in the technical register only,
-and this rule does not override that exception.
+This rule has no exception now. The bold lead-in carve-out it used to defer to
+was removed from VOICE.md, and PR descriptions and code comments ban the
+construction outright.
 Evidence: 9 records, first seen 2026-09-01, on PR description, Slack thread
 reply, Slack message, roadmap record correction, decision note, project
 record doc section, and a GitHub discussion plus Asana comment pair. Hand-cut

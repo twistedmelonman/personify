@@ -17,7 +17,10 @@ In order:
    how it reads.
 2. Surface fit. Would a person send this on the stated surface, to the stated
    audience? A memo on a PR comment is a failure even if every sentence is
-   clean.
+   clean. When a surface section is supplied with the context and it states a
+   hard format rule, a candidate that breaks it loses on surface fit however
+   well it reads. A PR description with a header, a bullet, a bolded label, or
+   a dash is the case this exists for.
 3. Voice. Does a specific person come through, or is it correct and anonymous?
 4. Residue. How much still reads as machine-written?
 
