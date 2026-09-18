@@ -209,6 +209,15 @@ Never as separate output, never as a question. It repeats because the count
 only resets when consolidation actually runs, so an ignored nudge means the
 evidence is still waiting, not that it stopped mattering.
 
+The status line is presentation, not part of the text. A person reading the
+result in a terminal wants it: it names the primary arm and the evidence record
+to hand to `show both`. A programmatic caller does not, because the next thing
+that happens to the text is that it gets written somewhere, and an agent
+running `gh pr create` would paste the line into the PR body. Any caller
+passing this output onward strips the line first, and the MCP bridge does it
+already (`mcp-server/src/strip-status-line.ts`). Keep it off surfaces the text
+lands on, and never treat it as content a later step can edit or compress.
+
 ### 6. Serve later requests from the record
 
 `show both` reads the record. It never re-runs the arms. It works right after a

@@ -187,6 +187,37 @@ Each of those is now a regression test. If a new preamble shape shows up in
 the wild, add a fixture to `test/strip-preamble.test.ts` rather than
 loosening the patterns.
 
+### The status line
+
+`stripStatusLine` removes the skill's own trailing status line
+(smartwatermelon/personify#86):
+
+    [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
+
+That line is presentation for a person reading a result in a terminal, where it
+names the primary arm and the evidence record to hand to `show both`. It is not
+part of the text, and a caller of this bridge is by definition programmatic: an
+agent that asks for a cleaned PR description and then runs `gh pr create` would
+paste the line into the PR body.
+
+Much easier than the preamble case, and the pattern is correspondingly strict
+rather than conservative. The line has a fixed shape, sits on the last line,
+and is bracketed at both ends, so an anchored full-line match has no plausible
+false positive against prose. It requires both fields in order, tolerates any
+wording in the middle field and any trailing field (which is how the
+`· 25 unconsolidated` nudge arrives), and matches the timestamp by shape
+without validating it as a date, since a malformed one is still the status line.
+
+Two deliberate non-behaviors. Only the last non-empty line is a candidate: a
+status line mid-document is the user quoting one, which this repo's own evidence
+records and regression fixtures do. And it never returns empty from non-empty
+input, so a result consisting only of a status line passes through rather than
+becoming a silent truncation, since that case means the rewrite itself went
+missing.
+
+`mode: "both"` is exempt. That mode asked for the full comparison, so the
+status line and the arm reports are the requested payload.
+
 ## Manual verification checklist
 
 Run this after any change to `mcp-server/src/`, since the automated test

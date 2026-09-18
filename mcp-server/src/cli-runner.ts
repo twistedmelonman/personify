@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import type { CliResult } from "./types.js";
 import { loadOAuthToken } from "./token.js";
 import { stripCliPreamble } from "./strip-preamble.js";
+import { stripStatusLine } from "./strip-status-line.js";
 
 export const PERSONIFY_INSTRUCTION =
   "Run the personify:personify skill on the text provided via stdin. Your " +
@@ -93,7 +94,14 @@ export async function runPersonify(
       settled = true;
       clearTimeout(timer);
       if (code === 0) {
-        resolve({ ok: true, text: stripCliPreamble(stdout) });
+        // "both" mode asked for the full comparison, so its status line and
+        // arm reports are the requested payload rather than exhaust. Only the
+        // default mode returns text a caller pastes somewhere else.
+        const body = stripCliPreamble(stdout);
+        resolve({
+          ok: true,
+          text: opts.mode === "both" ? body : stripStatusLine(body),
+        });
       } else {
         resolve({
           ok: false,

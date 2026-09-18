@@ -113,6 +113,58 @@ describe("runPersonify", () => {
     }
   });
 
+  // smartwatermelon/personify#86: the step 5 status line is presentation for a
+  // person at a terminal, and an agent calling this bridge pastes whatever it
+  // gets into a PR body.
+  it("strips the step 5 status line in default mode", async () => {
+    const child = makeFakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const resultPromise = runPersonify("draft text");
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+    child.stdout.emit(
+      "data",
+      Buffer.from(
+        "Gives `deploy-bot` assume-role on `ci-release`.\n\n[arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]\n",
+      ),
+    );
+    child.emit("close", 0);
+
+    const result = await resultPromise;
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.text).toBe(
+        "Gives `deploy-bot` assume-role on `ci-release`.",
+      );
+      expect(result.text).not.toContain("arm B primary");
+      expect(result.text).not.toContain("evidence:");
+    }
+  });
+
+  // "both" mode asked for the comparison, so the status line and the arm
+  // reports are the payload rather than exhaust.
+  it("keeps the status line in both mode", async () => {
+    const child = makeFakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const resultPromise = runPersonify("draft text", { mode: "both" });
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+    child.stdout.emit(
+      "data",
+      Buffer.from(
+        "Gives `deploy-bot` assume-role on `ci-release`.\n\n[arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]\n",
+      ),
+    );
+    child.emit("close", 0);
+
+    const result = await resultPromise;
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.text).toContain("arm B primary");
+      expect(result.text).toContain("evidence: 2026-08-31T09-14-22");
+    }
+  });
+
   it("maps non-zero exit code to a CliResult error including stderr", async () => {
     const child = makeFakeChild();
     spawnMock.mockReturnValue(child);
