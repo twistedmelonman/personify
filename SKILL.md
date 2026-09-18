@@ -1,7 +1,7 @@
 ---
 name: personify
-version: 1.2.0
-description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards and PR comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
+version: 1.3.0
+description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards, PR comments, PR descriptions, and code comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
 
@@ -23,6 +23,8 @@ Never state that a voice guide is "missing," "not configured," or "not found" wi
 
 If a voice guide is found, read it fully and treat it as authoritative. It describes one specific person's writing. Where it conflicts with any rule in this skill, the voice guide wins; the pattern groups in `rules/taxonomy.md` and the hard rules in `rules/hard.md` are only a backstop for residue it doesn't address.
 
+Two exceptions, and only these two: the GitHub PR descriptions section and the Code comments section are universal rules about the structure of an artifact, not preferences about how a person writes. The voice guide does not override either one. It still sets word choice, rhythm, and bluntness inside those artifacts; it never restores a header, a bullet, a bolded label, a dash, or a comment the code already explains. A voice guide that tries to is stale and should be edited, since a structural rule for a surface is not a voice.
+
 If no voice guide is found, read `VOICE.example.md` (in this skill's directory) for what one looks like and how to build it. Without a voice guide this skill makes text non-robotic but not distinctive: clean, competent, anonymous. Proceed with the general rules and say so, so the user knows a voice guide is what turns "not obviously AI" into "sounds like them."
 
 The voice guide is personal and never committed (git-ignored, like `.env`). It lives at a stable path outside the plugin install on purpose: the plugin installs into a version-pinned directory that is replaced on every upgrade, so a guide kept inside the install would be lost on each update. The committed `VOICE.example.md` documents the structure without containing anyone's voice.
@@ -37,8 +39,9 @@ Determine four things before rewriting anything. Infer first. Ask only when a
 wrong answer would change the output.
 
 - Surface. A PR URL means a PR comment. A repo with a branch and a diff means a
-  PR description. Headers and length suggest a document. Ask only when two
-  surfaces with different registers are equally likely.
+  PR description. A diff or a code block whose comments are the text being
+  edited means code comments. Headers and length suggest a document. Ask only
+  when two surfaces with different registers are equally likely.
 - Audience. Own repo means a familiar teammate, which is the default. A public
   repo issue reply means a stranger. The voice guide may name recurring people.
   Ask only when the text addresses someone by name you have no read on.
@@ -80,8 +83,20 @@ file says. One context per arm is the only version of "must not read
 `rules/taxonomy.md`" that holds.
 
 Each arm's subagent gets: the text, the context block from step 1, the voice
-guide, and the paths to its own rule files. Not the other arm's rule files, and
-not the other arm's output.
+guide, the paths to its own rule files, and the surface section from this file
+that matches the surface step 1 recorded, pasted in verbatim. Not the other
+arm's rule files, and not the other arm's output.
+
+That last item is load-bearing. The arms do the rewriting and they do not read
+this file, so a surface rule stated only here reaches nothing. The sections
+that carry surface rules are Work register, Technical content, GitHub PR
+descriptions, Code comments, and Task boards and project trackers. Paste the
+matching one, plus Work register when the surface takes the work register at
+all. When two could apply, paste both.
+
+Two of those sections state universal rules that outrank the voice guide: GitHub
+PR descriptions and Code comments. Both say so in their own text, so pasting the
+section carries the precedence with it.
 
 ### 3. Review
 
@@ -261,7 +276,7 @@ Defaults, which override the general guidance elsewhere in this skill:
 - No transition words doing structural work: "moreover," "furthermore," "additionally," "notably," "that said" as a reflex.
 - Drop framing that sets up a point instead of making it: "in this section we'll cover," "to understand this, it helps to first," "just to give some context."
 - Cut a subordinate clause if it only restates or hedges the clause it's attached to.
-- Use a list when the content is genuinely a list (steps, findings, changes). Don't force prose into a list, or a list into prose.
+- Use a list when the content is genuinely a list (steps, findings, changes). Don't force prose into a list, or a list into prose. This default does not reach PR descriptions or code comments, which take no lists at all: see those two sections, which override it.
 - Skip the greeting and the sign-off in short internal messages. Start with the content.
 
 What survives compression, and this is not negotiable: names, numbers, file paths, error text, technical caveats, and anything a reader would act on. What gets cut: hedges, qualifiers, restatements, throat-clearing, defensive completeness, and softening. Losing nuance is acceptable here. Losing a fact is not (never invent facts: `rules/hard.md`, rule 3).
@@ -286,23 +301,60 @@ Reference documentation, API docs, and published specs keep a neutral register: 
 
 Even here, cut words, not content. Keep every fact, caveat, and detail the original covers. The target is the same information in fewer words.
 
-## GitHub PR descriptions and review comments
+## GitHub PR descriptions
 
-A specific failure mode within technical content: unearned structure and defensive completeness, rather than flowery prose. None of the pattern groups in `rules/taxonomy.md` catch it, because the sentences themselves can be plain. What reads as AI-generated here is ceremony: headers a one-line change doesn't need, and a rundown of tests that don't apply that nobody asked about.
+A pull request description has a defined structure. It is not a conversation, a
+presentation, or a talk. The reader is a competent code reviewer who is about to
+read the diff, so the description exists to tell them what they cannot get from
+the diff: what was wrong, and what this does about it.
 
-- **Size the description to the diff.** A one-line, self-explanatory change gets a one-line description. Headers ("Summary," "Testing," "Impact") are earned by a PR that actually spans multiple files or concerns and needs navigation, not a default template.
-- **State what and why. Never how.** The diff is the how. If the description restates what the code already shows, cut it.
-- **No inflated stakes on routine changes.** "grants the service account the permissions it needs" beats "a critical step in modernizing our access architecture." Say the plain thing.
-- **Match the local register.** If the team's PRs run to fragments and lowercase starts, that's the norm, not a lapse. Don't upgrade a one-line change into a complete, formally punctuated paragraph out of reflex.
-- **Label review-comment severity explicitly.** "Nit:" / "Optional:" / "FYI:" instead of diplomatic hedging that leaves the reader guessing whether something is blocking.
-- **Say the one thing you concluded, not everything a review surfaced.** Your teammates can run the same automated review you can, so a comprehensive findings dump adds nothing they couldn't generate themselves, and it reads as generated precisely because it is what an automated tool produces. Value comes from judgment: which finding actually matters here, and what you think should happen. One considered comment beats eight correct ones. If you reviewed with a tool, that's fine, but what you post should be the conclusion you reached after reading it, in your words.
-- **No chatbot sign-offs.** Cut "let me know if you have questions," "happy to adjust," "hope this helps." If there's a real open question, ask it directly and stop there.
-- **Code blocks for exact output.** Terminal output, error messages, and diffs go in a code block verbatim, never paraphrased into prose.
-- **One paragraph is usually the ceiling for "why."** Plenty of real, substantial PRs ship with no written description beyond the title. Default to letting the title and diff carry the load; add prose only when a reviewer would otherwise be confused.
+This section is a universal rule, not a voice preference. It applies to every
+writer on every repo, and it outranks the voice guide. A `VOICE.md` never
+reopens a header, a bullet, a bolded label, or a dash on this surface. Step 0's
+"the voice guide wins" and rule 2 of `rules/hard.md` both carve this section out
+by name. The voice guide still sets word choice, sentence rhythm, and how blunt
+the sentences are; it does not set the structure.
+
+**Hard format.** No headers. No bold. No bullets. No numbered lists. No em
+dashes or en dashes. Plain paragraphs only. This overrides the Work register
+default that says to use a list when the content is a list: on this surface
+there are no lists.
+
+**Four parts, in this order, as plain prose:**
+
+1. The problem, stated plainly: when I do X, I get Y. I should get Z.
+2. The evidence, only when it is not already obvious from context. Show it or
+   link it.
+3. The solution, in a brief sum-up that assumes the reader will read the code.
+4. References, only when something had to be consulted that is not obvious and
+   not already part of the codebase.
+
+Do not number or label the parts in the output. They are the order the prose
+runs in, not a template to fill. Parts 2 and 4 get skipped when they do not
+apply, and skipping them is the normal case. A one-line change gets one line:
+the problem and the fix in a sentence.
+
+Two rules that survive from the general technical guidance. Never say how: the
+diff is the how, so a description that restates what the code already shows gets
+cut. And no inflated stakes on a routine change: "grants the service account the
+permissions it needs" beats "a critical step in modernizing our access
+architecture."
+
+Exact output stays exact. Terminal output, error messages, and diffs go in a
+code block verbatim, never paraphrased. A code block is not formatting ceremony
+and the no-headers rule does not touch it. Part 2 is usually where it lands.
+
+**Never invent the problem statement.** Part 1 is the part a padded description
+most often lacks, and it is the one part that cannot be derived from the diff or
+from the rest of the text. If the source does not carry it, say so and ask,
+per `rules/hard.md` rule 3. An agent calling this skill while opening a PR has
+the branch, the diff, and the issue, so it should supply the problem statement
+in the input rather than leave the skill to guess at one.
 
 Worked example, a small IAM permissions change:
 
-Before (defensive completeness, unearned headers):
+Before (unearned headers, a rundown of checks nobody asked for, no problem
+statement):
 
 > ## Security-critical access delta
 >
@@ -314,12 +366,82 @@ Before (defensive completeness, unearned headers):
 >
 > This PR is ready to merge upon approval.
 
-After (matches the team's actual register):
-> gives `deploy-bot` assume-role on `ci-release` so the new release pipeline can run. `terraform fmt` clean, nothing manual after merge.
+The source never says what was broken, so the rewrite cannot state it. Asking
+for it is the correct move, and the answer here was that the release pipeline
+fails at the assume-role step.
 
-Everything true in the original survives. What's cut: the header ceremony, and the enumeration of checks that don't apply. If a reviewer would ask "did you check X," answer it inline when asked, don't pre-empt every possible question in the description.
+After:
 
-Note what the rewrite does beyond cutting. The parenthetical aside became a subordinate clause carrying the same fact ("so the new release pipeline can run"). Group O bans the parenthetical construction, not the information: the reason this grant exists is a fact a reviewer needs, so it gets promoted into the sentence rather than deleted. Had the aside been color rather than fact, it would be gone entirely. Two short clauses got connected instead of stacked, per group X. The first person is optional here and only here: a PR description whose subject is the diff itself can lead with the verb, since the author is unambiguous from the PR metadata. The moment the description carries a judgment ("I'd rather do X," "I'm not sure this covers Y"), group W applies in full and the "I" goes back in.
+> When the release pipeline runs, it fails at the assume-role step. It should be able to assume `ci-release`.
+>
+> ```
+> AccessDenied: User: arn:aws:sts::...:assumed-role/deploy-bot is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::...:role/ci-release
+> ```
+>
+> Gives `deploy-bot` assume-role on `ci-release` and adds it to that role's trust policy. Existing role, one named principal. Nothing manual after merge.
+
+Every fact in the original survives. What is cut: both headers, the enumeration
+of checks that do not apply, and the merge-readiness sign-off. What is added is
+the problem statement and the error it produces, which came from asking rather
+than from guessing. The parenthetical aside became a clause carrying the same
+fact, per group O, which bans the construction and not the information. Two
+short clauses got connected instead of stacked, per group X.
+
+The first person is optional here and only here: a description whose subject is
+the diff itself can lead with the verb, since the PR metadata names the author.
+The moment it carries a judgment ("I'd rather do X," "I'm not sure this covers
+Y"), group W applies in full and the "I" goes back in.
+
+## Code comments
+
+Also a universal rule that outranks the voice guide, on the same terms as the PR
+description section above.
+
+The ratio of comment lines to code lines is never more than 1:1, and should be
+far lower. One line per logical block, and only where an informed reading of the
+code by a competent reviewer would not already tell them. No explanations, no
+conversation, no links, and no "because X and Y, then Z, and also, and also."
+
+What a comment is for is the thing the code cannot say: why this way rather than
+the obvious way, a constraint that is not visible locally, a workaround and what
+it works around. A comment that narrates the line under it is the tell. So is a
+comment that argues with the reader.
+
+Before:
+
+    # Increment the retry counter by one so that we can keep track of how many
+    # times we have attempted this request. This is important because we need
+    # to avoid retrying forever, and also because the backoff calculation
+    # below depends on this value being accurate.
+    retries += 1
+    # Calculate the backoff delay using exponential backoff
+    delay = base * (2 ** retries)
+
+After:
+
+    retries += 1
+    delay = base * (2 ** retries)
+
+Both comments went because the code says it. Six comment lines against two code
+lines also fails the ratio on its own. Had the base been an odd number chosen to
+dodge a thundering-herd problem, that would be the one line worth keeping, since
+no reading of the code recovers it.
+
+Docstrings and generated API documentation are not code comments for this rule.
+They are reference material and take the neutral register under Technical
+content above. The 1:1 ratio does not apply to them.
+
+## GitHub PR review comments
+
+A review comment is a message to a person, so it takes the work register rather
+than the PR description structure above. The failure mode here is a findings
+dump, not ceremony.
+
+- **Label severity explicitly.** "Nit:" / "Optional:" / "FYI:" instead of diplomatic hedging that leaves the reader guessing whether something is blocking.
+- **Say the one thing you concluded, not everything a review surfaced.** Your teammates can run the same automated review you can, so a comprehensive findings dump adds nothing they couldn't generate themselves, and it reads as generated precisely because it is what an automated tool produces. Value comes from judgment: which finding actually matters here, and what you think should happen. One considered comment beats eight correct ones. If you reviewed with a tool, that's fine, but what you post should be the conclusion you reached after reading it, in your words.
+- **No chatbot sign-offs.** Cut "let me know if you have questions," "happy to adjust," "hope this helps." If there's a real open question, ask it directly and stop there.
+- **Code blocks for exact output.** Terminal output, error messages, and diffs go in a code block verbatim, never paraphrased into prose.
+- **Match the local register.** If the team's comments run to fragments and lowercase starts, that's the norm, not a lapse. This covers sentence style only. It never licenses a header or a bullet in a PR description, which the section above governs regardless of what the team does.
 
 ## Task boards and project trackers
 
@@ -354,7 +476,7 @@ What the rewrite does not do is invent. "So we can decide whether to extend it" 
 
 This skill started as a fork-in-spirit of [blader/humanizer](https://github.com/blader/humanizer) (MIT license), which is itself built on Wikipedia's "Signs of AI writing" guide (WikiProject AI Cleanup). Credit to Blader for the original taxonomy and the draft -> audit -> rewrite process this skill still follows. This is a from-scratch rewrite rather than a literal fork, kept independent on purpose: Andrew wants a list that reflects his own read of what sounds AI-generated, updated on his own schedule, rather than tracking someone else's repo.
 
-Pattern groups E through K were added after close reading of specific pieces flagged as bad examples in conversation with Claude: a viral essay dense with rhetorical-hinge writing. Pattern groups R and S were added after reading a skilled human writer's advice newsletter whose polish leans hard on techniques that double as classic model tells: dense aphorism, mood-named section headers, one metaphor stretched across the whole piece. Pattern group T was added from a GitHub issue flagging a specific sentence that named its own importance rather than earning it. Pattern group U and the GitHub PR descriptions and review comments section were added after a colleague flagged Andrew's PR descriptions and review comments as reading AI-generated; close comparison against real team PRs on the same repo showed the tell wasn't prose-level at all, it was unearned section headers, defensive "here's what I didn't test and why" writeups nobody asked for, and, separately, a habit of answering multi-part questions by mirroring their enumeration point-by-point. Sources kept off the record intentionally; the patterns are what matter, not the byline.
+Pattern groups E through K were added after close reading of specific pieces flagged as bad examples in conversation with Claude: a viral essay dense with rhetorical-hinge writing. Pattern groups R and S were added after reading a skilled human writer's advice newsletter whose polish leans hard on techniques that double as classic model tells: dense aphorism, mood-named section headers, one metaphor stretched across the whole piece. Pattern group T was added from a GitHub issue flagging a specific sentence that named its own importance rather than earning it. Pattern group U and the GitHub PR descriptions and review comments sections (one section then, two now) were added after a colleague flagged Andrew's PR descriptions and review comments as reading AI-generated; close comparison against real team PRs on the same repo showed the tell wasn't prose-level at all, it was unearned section headers, defensive "here's what I didn't test and why" writeups nobody asked for, and, separately, a habit of answering multi-part questions by mirroring their enumeration point-by-point. Sources kept off the record intentionally; the patterns are what matter, not the byline.
 
 Pattern groups V through Y, the Work register section, and the expanded vocabulary in group B were added after feedback that Andrew's writing read as AI-generated in cases where no model output was involved at all. The diagnosis: a natural technical register that's polished, complete, evenly hedged, and impersonal, which is now the model default. Groups X and Y, the extended group B vocabulary, and the plain-text formatting rules in group O draw on [jalaalrd/anti-ai-slop-writing](https://github.com/jalaalrd/anti-ai-slop-writing) (MIT), rewritten to fit this skill's cluster-based calibration rather than its hard banned-word framing. Groups V and W are not from that repo; they were named by Andrew as the two patterns that matter most, and they carry the highest priority in this skill. That change also inverted this skill's earlier stance protecting complete grammatical prose in work contexts, which is why What NOT to flag and group U now scope that protection to long-form writing only. The register-classification list in Work register came out of adversarial review of that change: the first draft defined scope by enumerating work formats and long-form formats, which left most real inputs (company blog posts, long design docs, READMEs, external email) unclassified and let the model pick a branch arbitrarily.
 
@@ -363,6 +485,28 @@ Group Z, the Task boards section, the "write for a reader with no context" rule,
 The group B metaphor ban, the hyphenated-coinage list, and the ASD-STE100 bias in Work register came from [The load-bearing vocabulary of Claude](https://louisabraham.github.io/load-bearing/), which clusters the vocabulary of 47,464 GitHub pull requests scraped since January 2025. One of its eight clusters appears in 2026 and reaches 45% of human-attributed PRs, and its top words by lift are load-bearing at 123 times the corpus rate, then quietly, survived, latent, genuine, seam, genuinely, ladder, carries, pre-fix, byte-identical. That ranking is evidence about frequency, not a ban list: it is dominated by ordinary technical English (bytes, median, four, green) and by shop jargon that is simply what the corpus is about (subagent, harness, worktree), and importing it wholesale would flatten exactly the writing What NOT to flag protects. What got taken is the top tier of it, split by whether the substitution loses anything. The structural metaphors are banned because naming the mechanism is always available and always better. The adverbs and the coinages stay weighted because each has a use where it is the accurate word. Andrew's own read set that line, per this file's standing rule that his judgment is the source of truth rather than any external list.
 
 Groups V, W, and Z carry a regression set in `tests/regression/`, added as a standing guardrail so they don't quietly lose priority to the easier-to-spot stylistic groups. Run it on any commit that touches a pattern group, the Process steps, Work register, or Task boards. The cases are judged by hand rather than diffed, and the set exists because these three groups trace to the actual complaint (a lot of words but not a lot of substance) while the stylistic groups are the ones a future edit will naturally optimize for, since they are easy to verify.
+
+The PR description structure and the Code comments section came from Andrew on
+2026-09-17, as a specification rather than as a diagnosis of flagged writing.
+Both are universal surface rules and both outrank the voice guide, which is new:
+every other rule here yields to a `VOICE.md`. The reasoning is that a pull
+request description and a comment block are artifacts with a defined shape and a
+known reader, so their structure is not a matter of anyone's voice. The voice
+guide still governs the words inside them. Two overrides were deleted from
+Andrew's own `VOICE.md` in the same change rather than carved out in this file,
+at his instruction: the blog carve-out for em and en dashes, and the bold
+lead-in labels in the technical register. Deleting them was the right shape
+because both were formatting preferences sitting in a file about voice. The old
+"GitHub PR descriptions and review comments" section split in two here, since
+the description now has a fixed structure and a review comment is still a
+work-register message. The four-part order (problem, evidence, solution,
+references) is the format Andrew gave verbatim.
+
+That change also exposed a gap in Process step 2: the arms do the rewriting and
+never read this file, so every surface section here (Work register, Technical
+content, PR descriptions, Code comments, Task boards) reached nothing. Step 2
+now pastes the matching section into each arm. A rule stated only in SKILL.md
+was decoration before that.
 
 Note for future edits: `scripts/validate_skill.py` requires pattern-group headings to run A, B, C with no gaps, so Z is the last available letter and the taxonomy is now full. The intended path for a twenty-seventh pattern is to merge related groups rather than extend the scheme to AA: several groups already overlap heavily (H and S both cover self-narration, A and K both cover inflation, N and Z both cover boosterism), and consolidating them would free letters while making the list easier to apply. Extending the validator to AA/AB is the fallback if merging would lose a distinction worth keeping.
 

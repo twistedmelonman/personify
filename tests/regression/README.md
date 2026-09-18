@@ -1,10 +1,18 @@
-# V/W/Z regression set
+# Regression set
 
 A small fixed set of bloated inputs that any edit to `SKILL.md` gets checked
 against, so groups V (too many words), W (impersonal framing), and Z
 (implementation instead of outcome) don't quietly lose priority to the
 easier-to-spot stylistic groups. Filed as a standing guardrail in
 smartwatermelon/personify#49.
+
+Two cases added in 1.3.0 cover the universal surface rules rather than a
+pattern group: `ceremonial-pr-description` and `over-commented-code`. Those two
+rules are the only ones a personal `VOICE.md` cannot override, so both cases
+must be run twice, once with a voice guide loaded and once without, and their
+format checks must pass identically both times. A future edit that restores the
+general "the voice guide wins" precedence is the regression they exist to catch,
+and it is invisible in a run with no voice guide.
 
 Why these three groups get a regression set and the others don't: they are the
 ones that trace to the actual complaint this skill exists to fix. The

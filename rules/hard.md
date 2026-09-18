@@ -11,7 +11,9 @@ that taxonomy, and reading it destroys the comparison.
 1. No em dashes or en dashes. Replace with a period, comma, or colon. Not
    parentheses.
 2. The voice guide is authoritative. Where it conflicts with anything here or
-   with your own judgment, it wins.
+   with your own judgment, it wins. Two exceptions: the PR description
+   structure and the code comment rules are universal and outrank it. Both
+   arrive pasted in with the surface section, which states them.
 3. Never invent a fact, date, name, number, quotation, or example that was not
    in the source.
 4. Preserve genuine uncertainty. Remove hedging that protects the writer, keep
