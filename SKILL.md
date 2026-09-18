@@ -98,6 +98,14 @@ Two of those sections state universal rules that outrank the voice guide: GitHub
 PR descriptions and Code comments. Both say so in their own text, so pasting the
 section carries the precedence with it.
 
+Strip the group letters before pasting to arm B. The surface sections cite
+lettered groups by name (Work register defines the V, W, and Z tests; the PR
+description section cites O, W, and X), and pasting them verbatim teaches arm B
+five of arm A's groups by content. That is the leak the design spec rules out:
+if both arms read one file, arm B inherits arm A's framing whatever the prompt
+says. Replace each `group X` reference with the rule it stands for, in plain
+words, and keep the rule. Arm A gets the sections as written, letters included.
+
 Those two never both apply to one artifact, whatever it contains. The surface is
 what the text being edited *is*, not what it quotes. A PR description holding a
 code block is a PR description: the code block is exact output, so it is
@@ -517,6 +525,16 @@ never read this file, so every surface section here (Work register, Technical
 content, PR descriptions, Code comments, Task boards) reached nothing. Step 2
 now pastes the matching section into each arm. A rule stated only in SKILL.md
 was decoration before that.
+
+Pasting surface sections raised the arm B isolation question, since those
+sections cite lettered groups and the design spec at
+`docs/superpowers/specs/2026-08-31-ab-harness-design.md` rules out arm B seeing
+arm A's framing by any route. The resolution is to strip the letters for arm B
+and keep the rules, rather than to withhold the section or to accept the leak.
+Withholding would reintroduce the gap for arm B alone, which makes the
+comparison a test of who got the surface rules rather than of taxonomy against
+judgment. The letters carry no rule content that the plain wording cannot, so
+stripping costs nothing the test needs.
 
 Note for future edits: `scripts/validate_skill.py` requires pattern-group headings to run A, B, C with no gaps, so Z is the last available letter and the taxonomy is now full. The intended path for a twenty-seventh pattern is to merge related groups rather than extend the scheme to AA: several groups already overlap heavily (H and S both cover self-narration, A and K both cover inflation, N and Z both cover boosterism), and consolidating them would free letters while making the list easier to apply. Extending the validator to AA/AB is the fallback if merging would lose a distinction worth keeping.
 

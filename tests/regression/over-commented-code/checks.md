@@ -6,10 +6,10 @@ times.
 
 ## Ratio: the hard rule
 
-- [ ] Comment lines do not exceed code lines. The input is 12 comment lines
-      against 11 code lines, which already fails.
-- [ ] The result is far below 1:1, not merely at it. One comment here is the
-      target.
+- [ ] Comment lines do not exceed code lines. The input is 11 comment lines
+      against 7 code lines, which already fails.
+- [ ] The result is far below 1:1, not merely at it. One comment against 7 code
+      lines is the target.
 
 ## Content
 

@@ -12,9 +12,9 @@ def refresh_session(session_id: str) -> Session | None:
     return fetched
 ```
 
-One comment on eleven lines of code. Every other comment went because an
-informed reading of the code already says it: the cache lookup, the early
-return, the fetch, the store, the return.
+One comment against seven lines of code, down from eleven comment lines. Every
+other comment went because an informed reading of the code already says it: the
+cache lookup, the early return, the fetch, the store, the return.
 
 The surviving comment is the one fact no reading of the code recovers. The
 number 55 is unexplained in the code and looks like a typo for 60, which is
