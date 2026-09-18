@@ -87,3 +87,43 @@ The one substantive difference from the first run is that the problem statement
 now leads with the user-facing action ("when a session token is refreshed")
 rather than with the cache's keying, which is closer to the when-X-I-get-Y
 shape the section asks for.
+
+## Arm B, same day, same input
+
+Run against commit c00125c with the surface sections stripped of group letters
+by hand, as step 2 requires. Arm B received rules/hard.md, rules/learned.md,
+VOICE.md, and the stripped PR descriptions and Work register sections. It did
+not read rules/taxonomy.md or SKILL.md.
+
+Output:
+
+> When `refresh_session()` refreshes a token, it looks up the cache by session ID, but the cache is keyed on the user ID, so a refresh misses an entry that is present. It should find it.
+>
+> Changes that lookup to key on the user ID, with a regression test in `tests/test_session.py`.
+
+Every check in checks.md passes. All four cut items cut, all three surviving
+facts present, no invented symptom, no dashes introduced.
+
+Reported in plain description with no letters, which confirms the stripping
+worked: nothing in arm B's report names a lettered group, and the isolation
+held.
+
+## Comparing the two arms on this surface
+
+The two outputs are close enough that this case does not discriminate between
+them. Both produce two paragraphs, problem first, no part 2 and no part 4, and
+both cut the same four items for the same reasons. Arm A leads with the
+user-facing action ("when a session token is refreshed") and arm B leads with
+the function ("when `refresh_session()` refreshes a token"), which is a real
+difference in who the description addresses but not a difference either rule
+set can claim as a win.
+
+Both arms independently named the same gap in the input: the downstream
+consequence of a cache miss is absent, and only the author can supply it.
+Neither invented it. That agreement is the most useful signal here, since the
+invented-symptom failure was the one this case was built to catch and neither
+rule set produced it.
+
+Worth noting for a future consolidation: the shared residue on this surface is
+nothing. The reviewer was not run, so there is no verdict to record, and this
+is arm output plus a hand walk of checks.md rather than a harness result.
