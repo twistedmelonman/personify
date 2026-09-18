@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 1.3.0
+version: 1.3.1
 description: Strip AI-writing tells from prose before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Compresses wordy phrasing, puts a person back in impersonal sentences, and reframes implementation detail as outcomes a non-expert reader can see the value in. Covers task boards, PR comments, PR descriptions, and code comments, not just prose. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -204,6 +204,23 @@ When unconsolidated records reach 25, and again at every later multiple of 25,
 append to that same line:
 
     · 25 unconsolidated, /personify:personify-consolidate
+
+**Get that number by running `scripts/unconsolidated_count.sh`. Never count
+the evidence directory yourself.** The marker recording the last consolidation
+is `.consolidated`, a dotfile, so `ls` omits it without `-a` and a direct count
+(`ls -1 ~/.claude/personify-evidence | wc -l`) returns every record ever
+written. That number is not the unconsolidated count and is usually far larger.
+Reporting it tells the user to consolidate a directory they already
+consolidated, which has now happened three times. If the script is unavailable,
+the equivalent is:
+
+```bash
+find ~/.claude/personify-evidence -maxdepth 1 -name '*.md' \
+  -newer ~/.claude/personify-evidence/.consolidated | wc -l
+```
+
+Below 25 the line gets no nudge at all, so a wrong count is not a cosmetic
+error: it manufactures the nudge outright.
 
 Never as separate output, never as a question. It repeats because the count
 only resets when consolidation actually runs, so an ignored nudge means the

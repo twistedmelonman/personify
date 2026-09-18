@@ -127,6 +127,13 @@ Retired so far:
 consolidation run. Records newer than it are unconsolidated. A missing file
 means every record is unconsolidated.
 
+**Read the count from `scripts/unconsolidated_count.sh` rather than counting
+files.** The marker is a dotfile, so `ls` hides it unless given `-a`, and a
+plain directory count returns the total record set instead of the
+unconsolidated subset. This applies whenever the number is quoted, including
+outside a personify run: the count has been reported wrong three times, each
+time by counting the directory directly.
+
 The marker drives the nudge only. Consolidation itself reads every record in
 the directory, not just the unconsolidated ones. Dead-rule detection asks
 whether a group has fired in any run ever, so reading only the newest records
