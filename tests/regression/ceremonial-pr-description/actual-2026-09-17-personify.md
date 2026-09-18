@@ -54,3 +54,36 @@ kind: facts about the diff and about what was not tested that the section says
 to cut and the arm kept. See notes.md, "What a regression looks like," which
 did not anticipate this shape. The expectation stands as written; the gap is
 the arm's, not the fixture's.
+
+## Second run, same day, after the section fix
+
+Re-ran arm A on the same input with the same context and voice guide, against
+the strengthened PR descriptions section (commit 38e7187).
+
+Output:
+
+> When a session token is refreshed, the refresh can miss a cached entry that is actually present, because the token cache keys entries on the user ID while `refresh_session()` looks them up by session ID. It should find the cached entry.
+>
+> Changes the lookup in `refresh_session()` to key on the user ID, with a regression test in `tests/test_session.py`.
+
+Groups reported: A, B, J, O, P, Q, V, W, X, Z, plus both learned rules.
+
+All four previously failing items now cut, each for the stated reason:
+
+- "Ran the full test suite locally and everything passes": cut, CI reports it.
+- "No integration tests apply to this path": cut, a check not run.
+- "I did not test against staging": cut, names an absence rather than a risk.
+  The arm applied the caveat exception correctly, noting that "since the change
+  is confined to a single lookup" does not convert an absence into an
+  actionable caveat.
+- "Minor formatting cleanup in the same file": cut, cosmetic diff part.
+
+Every check in checks.md passes on this run. The problem statement again stays
+at the lookup level and invents no user-visible symptom. Two paragraphs, no
+part 2 and no part 4, which is correct: the input carries no error output to
+quote and nothing external was consulted.
+
+The one substantive difference from the first run is that the problem statement
+now leads with the user-facing action ("when a session token is refreshed")
+rather than with the cache's keying, which is closer to the when-X-I-get-Y
+shape the section asks for.
