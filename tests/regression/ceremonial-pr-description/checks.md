@@ -33,8 +33,15 @@ not override this surface.
 - [ ] The problem statement claims only what the input carries: the lookup
       misses a present cache entry. No claim about logouts, early expiry,
       latency numbers, or affected users.
-- [ ] If the run judged the problem statement underspecified, it asked or said
-      so rather than filling it in. Asking is a pass.
+- [ ] Exactly one of these two is observable in the run's output, and which one
+      does not matter:
+      - The first paragraph states the problem at the level the input supports,
+        naming the missed cache entry and nothing beyond it.
+      - The run does not produce a first paragraph at all, and instead emits a
+        question or a stated gap naming the problem statement as the thing it
+        cannot derive. A run that returns a finished description with no
+        problem statement, and no note that one is missing, fails: silence is
+        not asking.
 
 ## Facts that must survive
 

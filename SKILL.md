@@ -98,6 +98,14 @@ Two of those sections state universal rules that outrank the voice guide: GitHub
 PR descriptions and Code comments. Both say so in their own text, so pasting the
 section carries the precedence with it.
 
+Those two never both apply to one artifact, whatever it contains. The surface is
+what the text being edited *is*, not what it quotes. A PR description holding a
+code block is a PR description: the code block is exact output, so it is
+reproduced verbatim and the comment ratio does not touch it. Code comments are
+the surface only when the comments themselves are the text being edited. When a
+request covers both, edit them as two artifacts, one surface each, rather than
+merging the rules.
+
 ### 3. Review
 
 Run `reviewer/PROMPT.md` with the context and both candidates, labeled 1 and 2,
@@ -343,6 +351,8 @@ architecture."
 Exact output stays exact. Terminal output, error messages, and diffs go in a
 code block verbatim, never paraphrased. A code block is not formatting ceremony
 and the no-headers rule does not touch it. Part 2 is usually where it lands.
+Verbatim also means the Code comments section below does not reach inside it: a
+snippet quoted in a description is evidence, not comments being edited.
 
 **Never invent the problem statement.** Part 1 is the part a padded description
 most often lacks, and it is the one part that cannot be derived from the diff or
