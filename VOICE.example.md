@@ -10,6 +10,8 @@ Personify strips the statistical fingerprints of LLM writing. On its own, that m
 
 Personify's Step 0 checks three locations in order: the path in `PERSONIFY_VOICE` if that variable is set, then `VOICE.md` under your config directory (`$XDG_CONFIG_HOME/personify/VOICE.md`, or `~/.config/personify/VOICE.md`), then this skill's own directory, which is for repo-local development only. Put your real `VOICE.md` in the config directory: the plugin install is version-pinned and gets replaced on every upgrade, so a guide kept inside it disappears when you update. If a guide is found, Personify reads it and treats it as authoritative: where the general pattern list and the voice guide disagree, the voice guide wins, and the pattern list becomes a backstop for residue. If `VOICE.md` is absent, Personify falls back to generic cleanup and points here.
 
+**Two rules your voice guide cannot override.** Personify's GitHub PR descriptions section and its Code comments section are universal. A PR description runs problem, evidence, solution, references as plain prose with no headers, bold, bullets, lists, or dashes, and code comments stay under a 1:1 ratio to code. Both describe the shape of an artifact with a known reader rather than how anyone writes, so a `VOICE.md` that permits a header in a PR description or a paragraph-long comment is ignored on those two surfaces and nowhere else. Your guide still sets the words inside them: vocabulary, rhythm, and how blunt the sentences are.
+
 **First match wins, which matters if you have the repo checked out.** A `VOICE.md` in the config directory shadows one in the skill directory. Two copies means editing the repo file and having Step 0 keep reading the config copy, with no error and no sign anything is wrong. Symlink rather than copy: `ln -sf "$PWD/VOICE.md" ~/.config/personify/VOICE.md`. Verify with `ls -l ~/.config/personify/VOICE.md`. Step 0 opens `VOICE.md` by exact name and never lists the directory, so companion files (corpus notes, sampling plans) can sit next to whichever copy is real without affecting anything.
 
 ## How to build a `VOICE.md`
@@ -20,7 +22,8 @@ Feed an agent a corpus of writing that is unambiguously the person's own, then h
 - **Capture idiosyncrasy, not an average.** The goal is the person's fingerprints: recurring constructions, punctuation habits, how they open and close, the specific joke they keep reaching for. Averaging all their writing into one bland profile recreates the problem you're trying to solve.
 - **Be register-aware.** Most people code-switch (formal vs. casual, technical vs. personal, earnest vs. satirical). Name the registers and how to pick one, rather than flattening them together.
 - **Anchor every claim in a short real quote** from the corpus, so the feature is checkable and falsifiable by the person.
-- **List the conflicts.** Note which generic Personify rules this person's real voice overrides, so Personify stops flagging their signatures as machine artifacts.
+- **List the conflicts.** Note which generic Personify rules this person's real voice overrides, so Personify stops flagging their signatures as machine artifacts. Two rules are not available to override: the PR description structure and the code comment ratio, per the note above. Listing them anyway does nothing, and it will read as a live override to whoever edits the file next.
+- **Keep formatting preferences out of it.** A voice guide is about voice. A rule about headers, bullets, or bold labels is about the shape of a surface, so it belongs in whatever governs that surface rather than here, where it will outrank rules it should not.
 
 ## Suggested structure
 

@@ -124,7 +124,14 @@ asked to "pick randomly" settles into a fixed assignment, which is the position
 bias this is meant to remove. Record which arm got which label in the evidence
 record.
 
-Send the reviewer the two rewritten texts and the context. Nothing else. In
+Send the reviewer the two rewritten texts, the context, and the surface section
+from step 2, with its letters intact. The section is safe here because it
+identifies neither candidate, and the reviewer needs it: it judges surface fit,
+and without the section it judges against its own prior about what a PR
+description looks like, which tolerates headers. A candidate that breaks a hard
+format rule would then win on voice and the skill would emit a header it bans.
+
+Nothing else. In
 particular, do NOT send it either arm's report of what it applied: arm A
 reports lettered groups such as "V, W, Z" and arm B reports plain descriptions,
 so those reports identify the arms on sight and defeat the randomization. The
