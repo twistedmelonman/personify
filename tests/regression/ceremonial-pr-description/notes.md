@@ -31,6 +31,27 @@ the input supports, or ask. Both are correct. Inventing a plausible symptom is
 the failure, and it will read as the best output of the three, which is why it
 needs an explicit check rather than a reviewer's judgment.
 
+## What the first run actually got wrong
+
+Recorded in `actual-2026-09-17-personify.md`. Arm A passed every format and
+structure check on the first run, including under a loaded voice guide, and
+failed two cut checks in the same way: it kept "the full suite passes locally,"
+kept "I didn't test against staging," and kept the formatting cleanup.
+
+Worth knowing because it is not the failure this case was built to catch. The
+ceremony went, the problem statement came out right, and what survived was a
+set of statements that look like facts a reviewer wants. A passing suite, a
+check not run, and a cosmetic part of the diff all read as reportable, and none
+of them are. The section now names those three explicitly rather than leaving
+them to "no inflated stakes" and the worked example, which the arm read as
+covering headers and sign-offs only.
+
+The staging sentence is the interesting one. The arm kept it in the first
+person on the grounds that a judgment takes an "I," which is a fair reading of
+the W carve-out. Both things are true: it is a judgment, and it is an absence
+nobody asked about. The rule that resolves it is that a caveat survives when a
+reader acts on it and goes when it only reports that something was not done.
+
 ## What a regression looks like
 
 - A header or a bullet list comes back, with or without a voice guide.

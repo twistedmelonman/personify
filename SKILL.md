@@ -356,6 +356,18 @@ cut. And no inflated stakes on a routine change: "grants the service account the
 permissions it needs" beats "a critical step in modernizing our access
 architecture."
 
+Three things that look like facts and are not, and all three get cut whatever
+the source says. A passing test suite: CI reports it, so "the full suite passes
+locally" carries nothing. A check that was not run: "I didn't test against
+staging," "no integration tests apply here," "no plan/apply run." A cosmetic
+part of the diff: a formatting cleanup, a rename, an import reorder, which the
+reviewer sees in the diff and did not need announced. Part 3 covers what the
+change does, not an inventory of the diff and not a pre-emptive defense of it.
+If a reviewer wants to know whether you tested something, they will ask, and
+answering then is cheap. The exception is a real caveat a reader acts on: "this
+is untested against Postgres 14, which is what staging runs" names a risk, where
+"I didn't test against staging" only names an absence.
+
 Exact output stays exact. Terminal output, error messages, and diffs go in a
 code block verbatim, never paraphrased. A code block is not formatting ceremony
 and the no-headers rule does not touch it. Part 2 is usually where it lands.
