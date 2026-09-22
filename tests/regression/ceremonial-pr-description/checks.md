@@ -28,7 +28,7 @@ not override this surface.
 - [ ] Nothing says how the code works. "Keys the lookup on the user ID" is the
       change; a walkthrough of `refresh_session()` is not.
 
-## Never invent facts (`rules/hard.md` rule 3)
+## Never invent facts (hard rule 3 in SKILL.md)
 
 - [ ] The problem statement claims only what the input carries: the lookup
       misses a present cache entry. No claim about logouts, early expiry,
@@ -64,7 +64,8 @@ not override this surface.
 
 ## Anti-over-correction
 
-- [ ] Not parataxis (group X). Clauses connect where there is a causal link.
+- [ ] Not parataxis: clauses connect where there is a causal link, rather
+      than stacking as a row of bare declaratives.
 - [ ] The result is not curt to the point of hostility. Blunt is the target.
 - [ ] `refresh_session()` and `tests/test_session.py` are written exactly as
       they are, backticks included.

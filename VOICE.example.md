@@ -37,6 +37,21 @@ Mirror the sections below in `VOICE.md`:
 - **Conflicts with Personify**: the generic rules this voice overrides, and why.
 - **Corpus**: what was analyzed, and what's still unsampled. Version it.
 
+## Register rules live here now, not in the skill
+
+Personify 2.0 dropped the sections that used to carry per-surface content rules: how to write a work-register message, what a task board entry should say, what belongs in a PR review comment. They were content rules about what a message says rather than about how the prose reads, so a detector cannot judge them, and they are personal rather than universal.
+
+Put them in `Register-specific notes` in your own `VOICE.md`. That section is authoritative, so a rule written there governs the rewrite.
+
+What tends to belong there, as a starting list rather than a prescription:
+
+- **Per-surface register.** Which surfaces take fragments, lowercase starts, and contractions, and which take complete sentences. A Slack message and a 4000-word design doc are not the same register even for the same writer.
+- **What a task board entry or a status update should say.** Titles as declarative end states, descriptions answering what the work enables rather than listing components, and any test a real reader gave you for judging one.
+- **What a review comment should say.** Whether severity gets labeled explicitly, and whether the norm is one considered comment or a full findings list.
+- **How much hedging survives.** A hedge count per message is a voice fact, not a universal rule.
+
+Two rules deliberately stayed in the skill and do not belong here: the GitHub PR description structure and the code comment ratio. Both are universal, both outrank this file, and a `VOICE.md` that reopens a header or a bolded label on those surfaces is stale. See `rules/structure.md`.
+
 ## Recording feedback you have actually received
 
 A corpus tells you how someone writes. It cannot tell you how their writing is landing, and those come apart badly: the register a careful writer chose on purpose is often the one drawing complaints. When a real reader gives specific feedback, record it here, because it beats anything inferred from the corpus.

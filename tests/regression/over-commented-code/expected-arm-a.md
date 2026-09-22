@@ -26,4 +26,4 @@ service in general rather than this call in particular.
 
 The TTL rationale arrived as prose outside the code block, and it belongs in the
 comment. Moving it in is not inventing a fact: it was in the input. A run that
-drops it entirely has lost a fact and fails, per `rules/hard.md` rule 5.
+drops it entirely has lost a fact and fails, per hard rule 5 in SKILL.md.

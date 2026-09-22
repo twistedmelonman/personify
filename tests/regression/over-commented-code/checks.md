@@ -1,6 +1,7 @@
 # Checks: over-commented code
 
-Exercises the Code comments section, a universal rule. Run with and without a
+Exercises the Code comments section, a universal rule that no detector
+sees. Run with and without a
 voice guide loaded; the ratio and content checks must pass identically both
 times.
 
@@ -29,7 +30,8 @@ times.
 
 - [ ] The 55 second TTL still has its rationale attached: the auth service
       rotates signing keys on a 60 second cycle. This is the one comment worth
-      keeping, and dropping it fails the case under `rules/hard.md` rule 5.
+      keeping, and dropping it fails the case under hard rule 5 in SKILL.md
+      (preserve every fact the source carries).
 - [ ] That rationale lives in a comment next to the `ttl=55`, not in prose
       outside the code block.
 - [ ] The number stays 55. Not 60, not "about a minute."
