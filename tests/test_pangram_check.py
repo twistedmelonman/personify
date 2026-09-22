@@ -9,7 +9,7 @@ verbatim captures from the real API, paired with the exact text submitted. The
 synthetic_ ones are hand-written, because no sample of them could be induced on
 demand: a failed stage, an intermediate poll, and the model listing.
 
-Stdlib unittest, per tests/test_unconsolidated_count.py, because CI runs
+Stdlib unittest, per tests/test_validate_skill.py, because CI runs
 python3 -m unittest discover.
 """
 

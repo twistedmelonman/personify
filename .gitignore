@@ -4,3 +4,9 @@ __pycache__/
 # Personal voice guide (like .env, never committed); see VOICE.example.md
 VOICE.md
 VOICE.corpus.md
+
+# Another tool's config, not maintained here. Removed in 2.0: the tracked copy
+# had been mechanically substituted to "Codex" and cited paths that never
+# existed (.Codex-plugin/, ~/.Codex/). A local copy is fine; a tracked one
+# drifts because nothing in this repo reads it.
+AGENTS.md

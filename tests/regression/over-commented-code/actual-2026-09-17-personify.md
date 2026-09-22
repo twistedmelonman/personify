@@ -1,3 +1,5 @@
+A 1.x capture, kept as a dated record. The arms, the reviewer and the rules files it cites were removed in 2.0.
+
 Arm A, run 2026-09-17 against the working tree at commit a445881 (SKILL.md
 1.3.0), with Andrew's VOICE.md loaded. Arm A only: the two-arm harness plus
 reviewer was not run, so this records one arm's output rather than a harness

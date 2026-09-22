@@ -1,26 +1,25 @@
 # Regression set
 
-A small fixed set of bloated inputs that any edit to `SKILL.md` gets checked
-against, so groups V (too many words), W (impersonal framing), and Z
-(implementation instead of outcome) don't quietly lose priority to the
-easier-to-spot stylistic groups. Filed as a standing guardrail in
-smartwatermelon/personify#49.
+Two fixed cases covering the rules Pangram cannot enforce. Both exercise a
+universal surface rule rather than a prose quality: `ceremonial-pr-description`
+and `over-commented-code`.
 
-Two cases added in 1.3.0 cover the universal surface rules rather than a
-pattern group: `ceremonial-pr-description` and `over-commented-code`. Those two
-rules are the only ones a personal `VOICE.md` cannot override, so both cases
-must be run twice, once with a voice guide loaded and once without, and their
+These are the cases that survive 2.0, and the reason is the detector's blind
+spot. Pangram scores how prose reads, so it will pass a pull request
+description carrying ceremonial headers, bolded labels, and a merge-readiness
+sign-off, as long as the sentences themselves read human. Structure is
+invisible to it. A rule nothing measures is a rule that quietly stops firing, so
+these two get pinned down here.
+
+Both rules are also the only ones a personal `VOICE.md` cannot override, so each
+case must be run twice, once with a voice guide loaded and once without. The
 format checks must pass identically both times. A future edit that restores the
 general "the voice guide wins" precedence is the regression they exist to catch,
 and it is invisible in a run with no voice guide.
 
-Why these three groups get a regression set and the others don't: they are the
-ones that trace to the actual complaint this skill exists to fix. The
-Provenance section records it as "a lot of words but not a lot of substance,"
-which is a complaint about the ratio of words to ideas and about what the
-writing is about, not about em dashes or rule-of-three. Stylistic tells are
-easy to spot and easy to verify, so they are the ones a future edit will
-naturally optimize for. These are not, so they get pinned down here.
+The two bloated-prose cases from 1.x were deleted along with the taxonomy they
+asserted against. They checked lettered pattern groups by name, and those groups
+no longer exist.
 
 ## What each case records
 
@@ -29,9 +28,9 @@ Every case is a directory with four files:
 | File | What it holds |
 |------|---------------|
 | `input.md` | The bloated original. |
-| `expected-arm-a.md` | What a correct personify pass should produce. Not a string to diff against: a target to judge against, since there are many correct rewrites. |
+| `expected-arm-a.md` | What a correct personify pass should produce. Not a string to diff against: a target to judge against, since there are many correct rewrites. The `arm-a` in the name is a leftover from the 1.x two-arm harness and means nothing now. |
 | `checks.md` | The specific assertions that must hold, written so a human or a model can check them one at a time. |
-| `notes.md` | Which groups the case exercises and what a regression would look like. |
+| `notes.md` | What the case exercises and what a regression would look like. |
 
 ## Capture the actual output, always
 
@@ -46,7 +45,7 @@ delete the rest.
 ## Running the set
 
 There is no runner, on purpose. The thing being checked is a model's judgment
-about register and substance, which no assertion library evaluates. Run each
+about structure and substance, which no assertion library evaluates. Run each
 case by hand, or by dispatching a subagent per case:
 
 1. Run `input.md` through the current `SKILL.md`.
@@ -56,22 +55,10 @@ case by hand, or by dispatching a subagent per case:
    which case update `expected-arm-a.md` and `checks.md` in the same commit that
    changes `SKILL.md`, and say why in the commit message.
 
+Running the Pangram check on these inputs is not the test and does not replace
+it. A rewrite can score Human and still carry a header.
+
 ## When to run it
 
-Any commit touching a pattern group, the Process steps, the Work register
-section, or the Task boards section. Especially any commit that adds or
-re-letters a pattern group, since that is when priority quietly shifts.
-
-## Arms
-
-`expected-arm-a.md` is arm A's expectation. It encodes the taxonomy's idea of
-correct, which is what it was written against.
-
-There is deliberately no `expected-arm-b.md`. Arm B is model judgment, so
-pinning its exact output would either freeze one model's phrasing as correct or
-require rewriting the fixture on every model change. Arm B is judged by the
-reviewer and by accumulated evidence, not by a fixture.
-
-CI asserts the harness produces a well-formed comparison. It does not assert
-which arm wins. That is the question the harness exists to answer, and a CI
-job that answered it would be assuming the conclusion.
+Any commit touching the GitHub PR descriptions section, the Code comments
+section, `rules/structure.md`, or Step 0's voice-guide precedence.

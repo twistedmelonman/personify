@@ -1,10 +1,33 @@
 # Personify
 
-An agent skill that strips the statistical fingerprints of LLM writing out of prose before it goes out the door: emails, PR descriptions and review comments, docs, blog drafts, essays. It runs as a plain Markdown skill (`SKILL.md`), so any harness that supports skill-style instructions can use it.
+An agent skill that keeps text from reading as machine-written before it goes out the door: emails, PR descriptions and review comments, docs, blog drafts, essays. You draft in your own register, the skill edits toward it, and then the result gets checked against a detector rather than declared clean.
 
-Personify tracks its own pattern list on its own schedule. It started as a structural cousin of [blader/humanizer](https://github.com/blader/humanizer) (same idea, same MIT license, credited in [LICENSE](LICENSE)), but the taxonomy, wording, and version history here are independent and not synced against that project.
+Personify 2.0 is a break from 1.x. The hand-maintained taxonomy of AI-writing tells is gone, along with the A/B harness and the evidence corpus that fed it. Three things replace them: a per-user voice guide, current model judgment about what reads as machine-written, and [Pangram](https://www.pangram.com/), which returns a verdict on the finished text.
+
+It started as a structural cousin of [blader/humanizer](https://github.com/blader/humanizer) (same idea, same MIT license, credited in [LICENSE](LICENSE)). The wording, the rules, and the version history here are independent and were never synced against that project.
+
+## How it works
+
+1. **Draft**, guided by your `VOICE.md` and seven hard rules (no dashes, never invent a fact, preserve every fact, name the actor, and so on).
+2. **Check.** The result goes to `scripts/pangram_check.py`, which submits it to Pangram once and reports a verdict.
+3. **A `Human` verdict passes.** Anything else stops and reports the score and the flagged spans.
+
+There is no edit loop, and this is deliberate. Editing a draft toward the detector was measured and does not work: two rounds of rewriting moved the score from 0.990 to 0.989 to 1.000, so the second rewrite scored worse than the original. A failing verdict means rewriting from the source material, or routing the text to a human. It never means editing harder.
+
+Text under 40 words is skipped rather than classified. Below that the detector produces false passes, including the dangerous direction where AI-written prose comes back Human.
+
+## What a detector cannot see
+
+Two rules survive independently of Pangram, because Pangram scores how prose *reads* and cannot see how an artifact is *shaped*. It will happily pass a pull request description carrying ceremonial headers, bolded labels, and a "ready to merge upon approval" sign-off, as long as the sentences read human.
+
+- **GitHub PR descriptions.** No headers, no bullets, no bold, no dashes. Four parts as plain prose: the problem, the evidence, the solution, references.
+- **Code comments.** Never more than 1:1 comment lines to code lines, and far lower in practice. A comment is for what the code cannot say.
+
+Both are universal rules and both outrank a personal `VOICE.md`, which is otherwise authoritative. They also live in [`rules/structure.md`](rules/structure.md) for a caller that wants them without the rest of the skill.
 
 ## Installation
+
+The runtime artifact is the skill directory, not `SKILL.md` alone: `scripts/pangram_check.py`, `rules/structure.md`, and `VOICE.example.md` ship with it. Step 0 falls back to `VOICE.example.md` from the skill directory when no voice guide exists.
 
 ### Claude Code plugin
 
@@ -15,41 +38,42 @@ Personify tracks its own pattern list on its own schedule. It started as a struc
 
 Once installed, invoke it as `/personify:personify`.
 
-### Claude Code, project-local
+### Claude Code, project-local or global
 
-Clone or copy `SKILL.md` into the project's skill directory so it's available to collaborators who check out the repo:
-
-```bash
-mkdir -p .claude/skills/personify
-cp SKILL.md .claude/skills/personify/
-```
-
-### Claude Code, global
-
-Copy it into your user-level skills directory instead, so it's available in every project:
+Copy the skill directory so the script comes with it:
 
 ```bash
-mkdir -p ~/.claude/skills/personify
-cp SKILL.md ~/.claude/skills/personify/
+mkdir -p .claude/skills/personify        # or ~/.claude/skills/personify
+cp -R SKILL.md VOICE.example.md rules scripts .claude/skills/personify/
 ```
 
 Reload or start a new session after installing.
 
 ### Claude Desktop
 
-Claude Desktop reads skills from its own skills directory. Copy `SKILL.md` into a `personify/` folder there, matching the layout above, then restart Claude Desktop to pick it up.
+Claude Desktop reads skills from its own skills directory. Copy the same four paths into a `personify/` folder there, then restart Desktop.
 
-### Any other harness
+In practice Desktop has been unreliable about trusting its own filesystem connector state and about Step 0's "load `VOICE.md` and treat it as authoritative" instruction. See [`mcp-server/README.md`](mcp-server/README.md) for a bridge that routes Desktop's calls through the Claude Code CLI instead.
 
-The entire runtime artifact is `SKILL.md`. Any agent harness that loads Markdown-based skills can use it by copying that one file into wherever the harness expects skill definitions.
+## Pangram API key
 
-### Claude Desktop via MCP bridge (recommended over the raw-skill route above)
+The check needs a key. The client resolves one from three places, in order:
 
-Claude Desktop has, in practice, been unreliable about trusting its own
-filesystem connector state and about Step 0's "load `VOICE.md` and treat it
-as authoritative" instruction. See `mcp-server/README.md` for an MCP server
-that routes Desktop's personify calls through the Claude Code CLI instead,
-avoiding that failure mode entirely.
+1. `PANGRAM_API_KEY` in the environment, which wins as a deliberate override.
+2. `~/.config/personify/pangram-key`, mode 600 in a directory that is not group- or world-writable.
+3. `op read "op://Automation/Pangram/API Key"`, the 1Password bootstrap path.
+
+The file has to exist as a source because a headless caller (an MCP server under launchd, a git hook) gets no exported environment, so neither `PANGRAM_API_KEY` nor the service account token that `op` depends on is there.
+
+```bash
+mkdir -p ~/.config/personify
+printf '%s' "$PANGRAM_API_KEY" > ~/.config/personify/pangram-key
+chmod 600 ~/.config/personify/pangram-key
+```
+
+With no key the check exits 5 (unavailable) and the text routes to manual review. It never reports an outage as a pass.
+
+Pangram 3 is the production model, selected automatically. Pangram 4 costs ten times as much, agreed with v3 on every sample tested, and is reserved for a contested case: `PANGRAM_MODEL=pangram-4`.
 
 ## Usage
 
@@ -63,19 +87,21 @@ Personify this text: [paste text]
 Personify the writing in docs/launch-post.md
 ```
 
-## What it does
+The check itself runs standalone too. Redirect the file into stdin rather than piping through `echo`, because the stamp is keyed to the exact bytes and `echo` appends a newline:
 
-`SKILL.md` covers the standard taxonomy of AI-writing tells (inflated significance, empty vocabulary clusters, copula avoidance, filler and hedging, chatbot residue, and more), plus patterns added after reviewing specific pieces of writing that leaned on AI-adjacent techniques without being AI-written. It also has dedicated sections for GitHub PR descriptions, PR review comments, and code comments, where the tell is usually structural (unearned headers, defensive completeness, a comment block that narrates the code) rather than prose-level. The PR description and code comment rules are universal: they are the only two rules a personal `VOICE.md` cannot override, because both describe the shape of an artifact rather than how a person writes. It documents what *not* to flag too, so a clean human writer who hits one of these patterns once isn't treated as a false positive. See the file itself for the full pattern list and provenance notes.
+```bash
+python3 scripts/pangram_check.py < body.md
+```
+
+Exit codes: 0 pass, 2 AI, 3 mixed, 4 skipped (under the word floor), 5 unavailable.
 
 ## Voice guide
 
-Personify on its own makes prose non-robotic but not distinctive: clean, competent, and anonymous. The other half is an optional voice guide.
+Personify on its own makes prose non-robotic but not distinctive: clean, competent, anonymous. The other half is a voice guide, and 2.0 leans on it harder than 1.x did, since it is now the main thing making output sound like a particular person.
 
-At load time (`SKILL.md` Step 0), Personify looks for a `VOICE.md`, checking in order: the `PERSONIFY_VOICE` environment variable, then `~/.config/personify/VOICE.md` (honoring `XDG_CONFIG_HOME`), then the skill's own directory for repo-local development. The first one found wins, is read in full, and is treated as authoritative: where the general pattern list and the voice guide disagree, the voice guide wins. If none is found, Personify runs in generic mode and says so.
+At load time (`SKILL.md` Step 0), Personify looks for a `VOICE.md`, checking in order: the `PERSONIFY_VOICE` environment variable, then `~/.config/personify/VOICE.md` (honoring `XDG_CONFIG_HOME`), then the skill's own directory for repo-local development. The first one found wins, is read in full, and is treated as authoritative. If none is found, Personify runs in generic mode and says so.
 
-`VOICE.md` describes how one specific person actually writes, compiled from a corpus of their own writing (blog posts, essays, long-form email, docs). It is personal and git-ignored, exactly like `.env`. The committed [`VOICE.example.md`](VOICE.example.md) documents the structure and how to build one, without containing anyone's actual voice.
-
-Install the skill however you like, then put your voice guide at the stable path so upgrades never touch it:
+`VOICE.md` describes how one specific person actually writes, compiled from a corpus of their own writing. It is personal and git-ignored, exactly like `.env`. The committed [`VOICE.example.md`](VOICE.example.md) documents the structure without containing anyone's actual voice.
 
 ```bash
 mkdir -p ~/.config/personify
@@ -84,7 +110,7 @@ cp VOICE.example.md ~/.config/personify/VOICE.md   # then edit, or have an agent
 
 Don't keep your real `VOICE.md` inside the installed plugin directory: plugins install into a version-pinned path that is replaced on every upgrade, so a guide kept there is lost the next time the plugin updates.
 
-**If you also have this repo checked out,** symlink instead of copying. Step 0 takes the first path that exists, so a config copy shadows the repo one: you edit `VOICE.md` in the checkout, the skill keeps loading the config copy, and the edits never take effect. A symlink gives you one file at both paths.
+**If you also have this repo checked out,** symlink instead of copying. Step 0 takes the first path that exists, so a config copy shadows the repo one: you edit `VOICE.md` in the checkout, the skill keeps loading the config copy, and the edits never take effect.
 
 ```bash
 ln -sf "$PWD/VOICE.md" ~/.config/personify/VOICE.md
@@ -92,46 +118,25 @@ ln -sf "$PWD/VOICE.md" ~/.config/personify/VOICE.md
 
 To check which file is actually live: `ls -l ~/.config/personify/VOICE.md`.
 
-Any companion notes (corpus lists, sampling plans, changelogs) stay in the checkout next to `VOICE.md` and are git-ignored alongside it. Step 0 reads only `VOICE.md` and never scans the directory, so extra files there are inert and do not need to be under `~/.config/personify/`.
-
 ## Works with pr-review
 
-Personify is the last prose pass on the path from "review this PR" to a posted
-comment that reads like a person wrote it:
+Personify is the last prose pass on the path from "review this PR" to a posted comment that reads like a person wrote it.
 
-```text
-pr-review    →    personify
-(find it)         (de-AI it, send-ready)
+[pr-review](https://github.com/smartwatermelon/pr-review) calls personify directly: it drafts the review, then runs the draft through this skill before showing it to you for approval. If personify isn't installed, pr-review says so and shows the plain draft rather than failing.
+
+**Personify's output is final. Do not chain a further compression pass onto it.** A second pass that strips actors and full sentences undoes the rule that puts a person back in the sentence, which is one of the seven hard rules here. A `VOICE.md` outranks any such pass anyway: if your voice guide says you write in complete sentences, that is the target.
+
+## Development
+
+No build step. The validator and the test suite are the local checks:
+
+```bash
+python3 scripts/validate_skill.py
+python3 -m unittest discover -s tests -v
+cd mcp-server && npm test
 ```
 
-[pr-review](https://github.com/smartwatermelon/pr-review) already calls
-personify directly: its Phase 5 drafts the review, then runs the draft through
-this skill before showing it to you for approval. If personify isn't installed,
-pr-review says so and shows the plain draft rather than failing. The prose pass
-isn't essential to the review's substance.
-
-**Personify's output is final. Do not chain a further compression pass onto
-it.** Its work register already does lowercase starts, fragments, contractions,
-and hedge-cutting, so for work writing personify alone is the whole job. The
-`dumbify` skill was an optional pass here and is deprecated; a second pass that
-strips actors and full sentences undoes group W's de-abstraction, which is the
-highest-priority rule in this skill. A `VOICE.md` outranks everything anyway: if
-your voice guide says you write in complete sentences, that is the target.
-
-## How it learns
-
-Every invocation runs two rule sets against your text: the hand-maintained
-taxonomy, and current model judgment held to a short list of hard rules. A
-blind reviewer picks a winner and names what both missed. The run is recorded
-to `~/.claude/personify-evidence/`.
-
-You see one line by default. Ask `show both` for the full comparison, at any
-point, including a later session if you give it the timestamp.
-
-After 25 unconsolidated records, the status line suggests
-`/personify:personify-consolidate`. That pass reads the evidence and proposes
-rule changes as a PR: rules that never fire, rules that made output worse, and
-tells both arms keep missing. You approve each one. Nothing edits itself.
+The validator checks frontmatter keys, asserts `SKILL.md`'s version matches `.claude-plugin/plugin.json` exactly, and fails on any tracked Markdown file still citing a lettered pattern group from the deleted 1.x taxonomy.
 
 ## License
 
