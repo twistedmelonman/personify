@@ -10,7 +10,7 @@ import { checkPersonifyVersion, formatStalenessNote } from "./version-check.js";
 
 // Vendor-namespaced per the MCP spec's convention for _meta keys; a bare
 // "instruction" could collide with a future reserved key.
-export const INSTRUCTION_META_KEY = "com.smartwatermelon.personify/instruction";
+export const INSTRUCTION_META_KEY = "com.twistedmelonman.personify/instruction";
 
 export const VERBATIM_INSTRUCTION =
   "Return the following text to the user exactly as written, with no " +
@@ -38,7 +38,7 @@ export async function handlePersonifyCall(
   // The relay instruction is addressed to the calling model, not the reader,
   // so it stays out of the text content. Desktop renders text content straight
   // to the reader, which is how it ended up printed above every result
-  // (smartwatermelon/personify#50).
+  // (twistedmelonman/personify#50).
   //
   // The tool description is what actually delivers it: checked against
   // @modelcontextprotocol/sdk 1.30.0, every _meta reference in the SDK is

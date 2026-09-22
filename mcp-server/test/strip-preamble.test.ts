@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { stripCliPreamble } from "../src/strip-preamble.js";
 
-// Both fixtures below are verbatim from smartwatermelon/personify#50: two
+// Both fixtures below are verbatim from twistedmelonman/personify#50: two
 // separate calls in one session that leaked the CLI model's own meta-reasoning
 // ahead of the personified text.
 const ISSUE_50_SAMPLE_A = `This is long-form personal essay/blog writing (satire register, given "a modest proposal" framing and the corporate-cruelty subject matter), so I'll apply the voice guide's satire notes and personify the text now.
@@ -198,7 +198,7 @@ describe("stripCliPreamble", () => {
     expect(out).not.toContain("voice guide's rules");
   });
 
-  // smartwatermelon/personify#51. The lazy body match could span intervening
+  // twistedmelonman/personify#51. The lazy body match could span intervening
   // fences, so a multi-fence document whose first block was commentary-shaped
   // got its outermost fence pair deleted and the rest left unbalanced.
   it("does not unwrap a multi-fence document whose first block looks like commentary", () => {
@@ -230,7 +230,7 @@ describe("stripCliPreamble", () => {
     expect(stripCliPreamble(text)).toBe(text);
   });
 
-  // smartwatermelon/personify#52: three backticks are legal content inside a
+  // twistedmelonman/personify#52: three backticks are legal content inside a
   // four-backtick fence, so the inner-fence guard compares against the
   // opener's own length rather than a hardcoded marker.
   it("unwraps a four-backtick fence whose body holds a legal triple-backtick run", () => {
@@ -348,7 +348,7 @@ describe("stripCliPreamble", () => {
     expect(Date.now() - t0).toBeLessThan(250);
   });
 
-  // smartwatermelon/personify#55. The pattern comment promised a first-person
+  // twistedmelonman/personify#55. The pattern comment promised a first-person
   // authoring clause, but the bare apply/applying/using anchors did not
   // require a subject, so third-person sentences naming a rule artifact plus a
   // terminal word were eaten. Five of six realistic cases lost paragraph one.
@@ -378,7 +378,7 @@ describe("stripCliPreamble", () => {
     expect(stripCliPreamble(text)).toBe(text);
   });
 
-  // smartwatermelon/personify#53. CommonMark lets a closer be longer than its
+  // twistedmelonman/personify#53. CommonMark lets a closer be longer than its
   // opener, but no tool output produces one, and accepting it widened the
   // unwrap surface for nothing.
   it("does not unwrap a fence whose closer is longer than its opener", () => {

@@ -7,7 +7,7 @@ never has to load `VOICE.md` or evaluate Step 0's "treat this file as
 authoritative" instruction itself.
 
 See the parent repo's `SKILL.md` for what personify does, and the
-referenced issue (smartwatermelon/personify#23) for why this bridge exists:
+referenced issue (twistedmelonman/personify#23) for why this bridge exists:
 Desktop has, in practice, denied its own filesystem connector was present
 and flagged Step 0 as injection-shaped, even when the connector was
 confirmed active. Claude Code CLI does not have this problem.
@@ -137,7 +137,7 @@ looks for it there):
   single-digit to tens of seconds.
 - Requires the `claude` CLI to be installed and on `PATH` for whatever user
   account runs Desktop, with the `personify` plugin installed
-  (`/plugin marketplace add smartwatermelon/personify && /plugin install personify@personify`),
+  (`/plugin marketplace add twistedmelonman/personify && /plugin install personify@personify`),
   and requires the OAuth token file described above under "Authenticate."
 
 ## Output handling
@@ -148,7 +148,7 @@ text get kept out of it:
 - The verbatim-relay instruction ("treat this as final, don't re-edit it")
   is addressed to the calling model, so it rides in the tool description. It
   used to be prepended to the text content, which meant Desktop printed it to
-  the reader above every result (smartwatermelon/personify#50). The result's
+  the reader above every result (twistedmelonman/personify#50). The result's
   `_meta` also carries it under a vendor-namespaced key, but that is
   best-effort only: checked against SDK 1.30.0, nothing forwards a result's
   `_meta` into model context, so the tool description is what actually
@@ -190,7 +190,7 @@ loosening the patterns.
 ### The status line
 
 `stripStatusLine` removes the skill's own trailing status line
-(smartwatermelon/personify#86):
+(twistedmelonman/personify#86):
 
     [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
 

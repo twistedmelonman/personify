@@ -6,7 +6,7 @@
 // is not part of the text. An agent calling this bridge on the way to
 // `gh pr create` pastes whatever comes back into the PR body, so the line ends
 // up in the PR, where it means nothing to a reviewer and reads as tool exhaust
-// (smartwatermelon/personify#86).
+// (twistedmelonman/personify#86).
 //
 // This is the same class of leak as strip-preamble.ts and a much easier case.
 // The preamble strip has to tell "so I'll apply the voice guide's rules" from

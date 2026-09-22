@@ -46,7 +46,7 @@ describe("handlePersonifyCall", () => {
     expect(result.content[0].text).toBe("clean text[stale note]");
   });
 
-  // smartwatermelon/personify#50: the verbatim-relay instruction is addressed
+  // twistedmelonman/personify#50: the verbatim-relay instruction is addressed
   // to the calling model, not to the reader. Putting it in the text content
   // meant Desktop rendered it above every result.
   it("keeps the verbatim-relay instruction out of the user-visible text", async () => {
@@ -72,7 +72,7 @@ describe("handlePersonifyCall", () => {
     );
   });
 
-  // End-to-end guard for smartwatermelon/personify#50. The reported output was
+  // End-to-end guard for twistedmelonman/personify#50. The reported output was
   // two separate leaks concatenated: the relay instruction prepended here, and
   // the CLI model's own meta-commentary coming up through runPersonify. Neither
   // may reach content[0].text.

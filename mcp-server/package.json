@@ -1,5 +1,5 @@
 {
-  "name": "@smartwatermelon/personify-mcp",
+  "name": "@twistedmelonman/personify-mcp",
   "version": "0.2.0",
   "description": "MCP bridge that lets Claude Desktop run the personify skill via the Claude Code CLI",
   "type": "module",
