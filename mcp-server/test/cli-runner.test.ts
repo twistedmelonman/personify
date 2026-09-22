@@ -84,7 +84,7 @@ describe("runPersonify", () => {
     expect(result).toEqual({ ok: true, text: "some, text with an em dash" });
   });
 
-  // smartwatermelon/personify#50: PERSONIFY_INSTRUCTION already said "no
+  // twistedmelonman/personify#50: PERSONIFY_INSTRUCTION already said "no
   // commentary, no preamble" and the CLI model emitted one anyway, so the
   // stripping pass runs on stdout rather than trusting the prompt.
   it("strips a leaked commentary preamble from CLI stdout", async () => {
@@ -113,7 +113,7 @@ describe("runPersonify", () => {
     }
   });
 
-  // smartwatermelon/personify#86: the step 5 status line is presentation for a
+  // twistedmelonman/personify#86: the step 5 status line is presentation for a
   // person at a terminal, and an agent calling this bridge pastes whatever it
   // gets into a PR body.
   it("strips the step 5 status line in default mode", async () => {

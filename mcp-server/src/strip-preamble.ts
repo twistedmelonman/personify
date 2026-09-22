@@ -1,6 +1,6 @@
 // The CLI-side model sometimes narrates its own editing plan before emitting
 // the personified text, despite PERSONIFY_INSTRUCTION saying "no commentary,
-// no preamble" (smartwatermelon/personify#50). Prompt wording alone did not
+// no preamble" (twistedmelonman/personify#50). Prompt wording alone did not
 // hold, so the leak is also removed here.
 //
 // The stripping is deliberately conservative. A false negative leaves a stray
@@ -184,7 +184,7 @@ function stripWrappingFence(text: string): string {
   // The body must contain no fence marker of its own. Without this, the lazy
   // match spans intervening fences, so a document that merely opens and closes
   // with a code block gets its outermost pair deleted and the rest left
-  // unbalanced, which is a corrupt document (smartwatermelon/personify#51).
+  // unbalanced, which is a corrupt document (twistedmelonman/personify#51).
   // Compared against the opener's own length: inside a four-backtick fence, a
   // run of three backticks is legal content, not a nested fence.
   if (body.includes(fence)) return text;
@@ -214,7 +214,7 @@ export function stripCliPreamble(text: string): string {
   if (paragraphs.length < 2) return unfenced.trim();
 
   // The observed leak is at most two paragraphs: one commentary, one handoff
-  // (smartwatermelon/personify#50). Bounding the loop keeps a false positive
+  // (twistedmelonman/personify#50). Bounding the loop keeps a false positive
   // from cascading through a document: without it, "at least one paragraph
   // survives" is the only guarantee, which is nearly worthless on a long text.
   const MAX_STRIPPED_PARAGRAPHS = 2;
@@ -226,7 +226,7 @@ export function stripCliPreamble(text: string): string {
     const candidate = paragraphs[start].trim();
     // Text inside a code fence is code, whatever it says. A fenced block whose
     // contents happen to read like commentary is still the user's content
-    // (smartwatermelon/personify#51).
+    // (twistedmelonman/personify#51).
     if (/^`{3,}/.test(candidate)) break;
     if (looksLikeCommentary(candidate) || HANDOFF_PATTERN.test(candidate)) {
       start += 1;

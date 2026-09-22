@@ -32,7 +32,7 @@ The runtime artifact is the skill directory, not `SKILL.md` alone: `scripts/pang
 ### Claude Code plugin
 
 ```
-/plugin marketplace add smartwatermelon/personify
+/plugin marketplace add twistedmelonman/personify
 /plugin install personify@personify
 ```
 
