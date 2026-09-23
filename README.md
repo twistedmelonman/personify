@@ -57,13 +57,26 @@ In practice Desktop has been unreliable about trusting its own filesystem connec
 
 ## Pangram API key
 
-The check needs a key. The client resolves one from three places, in order:
+The check needs a key, and each machine needs it installed once. 1Password holds the canonical copy; the macOS login Keychain holds the per-machine copy. After installing the plugin, run this once from a terminal signed in to 1Password:
+
+```bash
+python3 ~/.claude/plugins/cache/personify/personify/<version>/scripts/pangram_check.py --install-key
+```
+
+The exact path is the plugin's install path (listed in `~/.claude/plugins/installed_plugins.json`), or `scripts/pangram_check.py` in a copied skill directory. It reads the key with `op read` and stores it as the Keychain item `personify-pangram-key`. Without 1Password, add the item by hand; `security` prompts for the key, which keeps it out of shell history:
+
+```bash
+security add-generic-password -U -a "$(id -un)" -s personify-pangram-key -w
+```
+
+`--check-key` confirms a key resolves, without calling Pangram. The client resolves one from four places, in order:
 
 1. `PANGRAM_API_KEY` in the environment, which wins as a deliberate override.
-2. `~/.config/personify/pangram-key`, mode 600 in a directory that is not group- or world-writable.
-3. `op read "op://Automation/Pangram/API Key"`, the 1Password bootstrap path.
+2. The login Keychain item `personify-pangram-key`, skipped where `security` does not exist.
+3. `~/.config/personify/pangram-key`, mode 600 in a directory that is not group- or world-writable.
+4. `op read "op://Automation/Pangram/API Key"`, the 1Password bootstrap path.
 
-The file has to exist as a source because a headless caller (an MCP server under launchd, a git hook) gets no exported environment, so neither `PANGRAM_API_KEY` nor the service account token that `op` depends on is there.
+The Keychain and the file have to exist as sources because a headless caller (an MCP server under launchd, a git hook) gets no exported environment, so neither `PANGRAM_API_KEY` nor the terminal session that `op` depends on is there. Off macOS, use the file:
 
 ```bash
 mkdir -p ~/.config/personify
@@ -71,7 +84,7 @@ printf '%s' "$PANGRAM_API_KEY" > ~/.config/personify/pangram-key
 chmod 600 ~/.config/personify/pangram-key
 ```
 
-With no key the check exits 5 (unavailable) and the text routes to manual review. It never reports an outage as a pass.
+With no key the check exits 5 (unavailable), names the install command, and the text routes to manual review. It never reports an outage as a pass.
 
 Pangram 3 is the production model, selected automatically. Pangram 4 costs ten times as much, agreed with v3 on every sample tested, and is reserved for a contested case: `PANGRAM_MODEL=pangram-4`.
 

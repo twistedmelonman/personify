@@ -23,6 +23,11 @@ vi.mock("../src/token.js", () => ({
   loadOAuthToken: (...args: unknown[]) => loadOAuthTokenMock(...args),
 }));
 
+const checkPangramKeyMock = vi.fn();
+vi.mock("../src/key-preflight.js", () => ({
+  checkPangramKey: (...args: unknown[]) => checkPangramKeyMock(...args),
+}));
+
 const { runPersonify, parseReport, DEFAULT_TIMEOUT_MS } =
   await import("../src/cli-runner.js");
 
@@ -58,6 +63,8 @@ let env: NodeJS.ProcessEnv;
 beforeEach(async () => {
   spawnMock.mockReset();
   loadOAuthTokenMock.mockReset();
+  checkPangramKeyMock.mockReset();
+  checkPangramKeyMock.mockResolvedValue({ kind: "ok" });
   loadOAuthTokenMock.mockResolvedValue({
     ok: true,
     token: "sk-ant-oat01-test",
@@ -337,6 +344,44 @@ describe("runPersonify", () => {
     });
     expect(outcome).toEqual({ kind: "failed", error: "no OAuth token found" });
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("runs the key preflight against the installed script", async () => {
+    const { child, promise } = await start();
+    expect(checkPangramKeyMock).toHaveBeenCalledWith(
+      join(installPath, "scripts", "pangram_check.py"),
+      env,
+    );
+    child.emit("close", 1);
+    await promise;
+  });
+
+  it("fails with the script's message, before spawning, when no key resolves", async () => {
+    checkPangramKeyMock.mockResolvedValue({
+      kind: "missing",
+      error: "no Pangram API key found. Run --install-key.",
+    });
+    const outcome = await runPersonify("text", {
+      installedPluginsPath: installed,
+      env,
+    });
+    expect(outcome).toEqual({
+      kind: "failed",
+      error: "no Pangram API key found. Run --install-key.",
+    });
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(loadOAuthTokenMock).not.toHaveBeenCalled();
+  });
+
+  it("proceeds as before when the preflight is skipped", async () => {
+    checkPangramKeyMock.mockResolvedValue({
+      kind: "skipped",
+      reason: "the check script predates --check-key",
+    });
+    const { child, promise, body } = await start();
+    await writeFile(body, "Draft.\n");
+    child.emit("close", 0);
+    expect((await promise).kind).toBe("not_verified");
   });
 
   it("keeps the 180s budget", () => {

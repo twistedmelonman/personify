@@ -1,11 +1,13 @@
 {
   "name": "@twistedmelonman/personify-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP bridge that lets Claude Desktop run the personify skill via the Claude Code CLI",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "node scripts/clean-dist.mjs",
     "build": "tsc",
+    "prepare": "npm run build",
     "install-desktop-config": "npm run build && node scripts/install-desktop-config.mjs",
     "start": "node dist/index.js",
     "test": "vitest run",

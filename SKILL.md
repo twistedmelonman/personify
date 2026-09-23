@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 2.0.1
+version: 2.0.2
 description: Draft in your own register, then check the result against a detector before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Submits the result to Pangram and stops when the verdict is not Human, rather than editing toward a score. Also carries the structural rules for GitHub PR descriptions and code comments, which no detector can see. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -196,10 +196,20 @@ prose at 15 words came back Human at 1.0. That is why the floor is double the
 measured boundary. A short text is routed by the surface's own rules and never
 stamped as verified.
 
-The client resolves its key from `PANGRAM_API_KEY`, then
-`~/.config/personify/pangram-key` at mode 600, then `op read`. An explicitly
-exported key wins as a deliberate override. The file has to exist as a source
-because a headless caller gets neither an environment nor a TTY.
+The client resolves its key from `PANGRAM_API_KEY`, then the macOS login
+Keychain item `personify-pangram-key`, then `~/.config/personify/pangram-key`
+at mode 600, then `op read`. An explicitly exported key wins as a deliberate
+override. The Keychain and the file have to exist as sources because a
+headless caller gets neither an environment nor a TTY.
+
+When no key resolves, say so plainly and give the install command, which
+copies the key from 1Password into the Keychain once, from a terminal:
+
+```bash
+python3 <skill dir>/scripts/pangram_check.py --install-key
+```
+
+`--check-key` reports whether a key resolves, without a network call.
 
 ## What NOT to flag
 

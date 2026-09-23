@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# personify-mcp
+# Claude Desktop's entry point for the personify MCP bridge. dist/ is
+# gitignored and nothing rebuilds it after a git pull, so Desktop used to run
+# whatever stale build happened to be there. This rebuilds dist/ when it is
+# missing or older than its sources, then execs the server.
+#
+# stdout is the MCP stdio channel. Every line this script or npm prints goes
+# to stderr, or it would corrupt the protocol stream.
+#
+# Written for the macOS system bash (3.2) as well as bash 5, since Desktop may
+# resolve /usr/bin/env bash to either.
+
+log() {
+  echo "personify-mcp: $*" >&2
+}
+
+die() {
+  log "ERROR: $*"
+  exit 1
+}
+
+script_path="${BASH_SOURCE[0]}"
+while [[ -L "${script_path}" ]]; do
+  link_dir="$(cd -P "$(dirname "${script_path}")" && pwd)"
+  script_path="$(readlink "${script_path}")"
+  [[ "${script_path}" != /* ]] && script_path="${link_dir}/${script_path}"
+done
+server_dir="$(cd -P "$(dirname "${script_path}")/.." && pwd)"
+entry="${server_dir}/dist/index.js"
+
+# Desktop launches with a near-empty PATH. Homebrew's prefixes are where node
+# usually lives on macOS, so they are tried before giving up.
+if ! command -v node >/dev/null 2>&1; then
+  PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+  export PATH
+fi
+command -v node >/dev/null 2>&1 \
+  || die "node not found on PATH (${PATH}). Install Node.js >= 20.19."
+
+needs_build() {
+  [[ ! -f "${entry}" ]] && return 0
+  local newer
+  newer="$(find "${server_dir}/src" "${server_dir}/tsconfig.json" \
+    "${server_dir}/package.json" "${server_dir}/package-lock.json" \
+    -newer "${entry}" -print -quit 2>/dev/null)" || true
+  [[ -n "${newer}" ]]
+}
+
+needs_install() {
+  local marker="${server_dir}/node_modules/.package-lock.json"
+  [[ ! -f "${marker}" ]] && return 0
+  [[ "${server_dir}/package-lock.json" -nt "${marker}" ]]
+}
+
+if needs_build; then
+  command -v npm >/dev/null 2>&1 \
+    || die "dist/ is missing or stale and npm is not on PATH (${PATH})."
+  if needs_install; then
+    # npm ci also builds, through the package's prepare script.
+    log "installing dependencies in ${server_dir}"
+    npm --prefix "${server_dir}" ci 1>&2 \
+      || die "npm ci failed in ${server_dir}. Run it there by hand to see why."
+  fi
+  if needs_build; then
+    log "rebuilding ${entry}"
+    npm --prefix "${server_dir}" run build 1>&2 \
+      || die "npm run build failed in ${server_dir}. Run it there by hand to see why."
+  fi
+  [[ -f "${entry}" ]] || die "the build finished but ${entry} does not exist."
+fi
+
+exec node "${entry}"

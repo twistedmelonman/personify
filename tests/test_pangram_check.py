@@ -91,6 +91,10 @@ def failing_op():
     return None
 
 
+def no_keychain():
+    return None
+
+
 class TempConfig:
     """Give a test its own XDG_CONFIG_HOME so no real stamp is ever written."""
 
@@ -278,32 +282,66 @@ class SecretResolutionTests(unittest.TestCase):
         self.key_file.write_text(contents, encoding="utf-8")
         os.chmod(self.key_file, mode)
 
+    def resolve(self, env=None, op_read=failing_op, keychain_read=no_keychain):
+        return pangram.resolve_key(
+            dict(self.env) if env is None else env,
+            op_read=op_read,
+            keychain_read=keychain_read,
+        )
+
     def test_missing_secret_fails_closed(self):
         with self.assertRaises(pangram.CheckError) as caught:
-            pangram.resolve_key(dict(self.env), op_read=failing_op)
+            self.resolve()
         self.assertIn("no Pangram API key", str(caught.exception))
+
+    def test_missing_secret_names_the_install_commands(self):
+        with self.assertRaises(pangram.CheckError) as caught:
+            self.resolve()
+        message = str(caught.exception)
+        self.assertIn(f"{pangram.SCRIPT_PATH} --install-key", message)
+        self.assertIn(
+            "security add-generic-password -U -a \"$(id -un)\" "
+            "-s personify-pangram-key -w",
+            message,
+        )
+        # The manual command ends at -w so `security` prompts for the key.
+        self.assertRegex(message, r"-s personify-pangram-key -w\n")
 
     def test_key_file_is_read_when_the_env_var_is_absent(self):
         self.write_key()
-        self.assertEqual(
-            pangram.resolve_key(dict(self.env), op_read=failing_op), "secret-key"
-        )
+        self.assertEqual(self.resolve(), "secret-key")
 
     def test_env_var_wins_over_the_key_file(self):
         self.write_key("from-file\n")
         env = dict(self.env, PANGRAM_API_KEY="from-env")
-        self.assertEqual(pangram.resolve_key(env, op_read=failing_op), "from-env")
+        self.assertEqual(self.resolve(env), "from-env")
+
+    def test_env_var_wins_over_the_keychain(self):
+        env = dict(self.env, PANGRAM_API_KEY="from-env")
+        self.assertEqual(
+            self.resolve(env, keychain_read=lambda: "from-keychain"), "from-env"
+        )
+
+    def test_keychain_wins_over_the_key_file_and_one_password(self):
+        self.write_key("from-file\n")
+        self.assertEqual(
+            self.resolve(
+                op_read=lambda: "from-op", keychain_read=lambda: "from-keychain"
+            ),
+            "from-keychain",
+        )
+
+    def test_key_file_wins_over_one_password(self):
+        self.write_key("from-file\n")
+        self.assertEqual(self.resolve(op_read=lambda: "from-op"), "from-file")
 
     def test_one_password_is_the_last_resort(self):
-        self.assertEqual(
-            pangram.resolve_key(dict(self.env), op_read=lambda: "from-op"),
-            "from-op",
-        )
+        self.assertEqual(self.resolve(op_read=lambda: "from-op"), "from-op")
 
     def test_group_readable_key_file_is_rejected(self):
         self.write_key(mode=0o644)
         with self.assertRaises(pangram.CheckError) as caught:
-            pangram.resolve_key(dict(self.env), op_read=failing_op)
+            self.resolve()
         self.assertIn("permissive", str(caught.exception))
 
     def test_world_writable_parent_directory_is_rejected(self):
@@ -312,14 +350,148 @@ class SecretResolutionTests(unittest.TestCase):
         os.chmod(self.personify, 0o777)
         self.addCleanup(os.chmod, self.personify, original)
         with self.assertRaises(pangram.CheckError) as caught:
-            pangram.resolve_key(dict(self.env), op_read=failing_op)
+            self.resolve()
         self.assertIn("world-writable", str(caught.exception))
 
     def test_empty_key_file_is_rejected(self):
         self.write_key("   \n")
         with self.assertRaises(pangram.CheckError) as caught:
-            pangram.resolve_key(dict(self.env), op_read=failing_op)
+            self.resolve()
         self.assertIn("empty", str(caught.exception))
+
+
+class CheckKeyTests(unittest.TestCase):
+    def setUp(self):
+        self.config = TempConfig()
+        self.addCleanup(self.config.cleanup)
+
+    def test_a_resolvable_key_exits_zero_without_echoing_it(self):
+        code, report = pangram.check_key(
+            dict(self.config.env),
+            op_read=failing_op,
+            keychain_read=lambda: "sk-secret-value",
+        )
+        self.assertEqual(code, pangram.EXIT_PASS)
+        self.assertEqual(report, {"status": "KEY_OK"})
+        self.assertNotIn("sk-secret-value", json.dumps(report))
+
+    def test_no_key_exits_unavailable_with_the_install_message(self):
+        code, report = pangram.check_key(
+            dict(self.config.env), op_read=failing_op, keychain_read=no_keychain
+        )
+        self.assertEqual(code, pangram.EXIT_UNAVAILABLE)
+        self.assertEqual(report["status"], "UNAVAILABLE")
+        self.assertIn("no Pangram API key", report["error"])
+        self.assertIn("--install-key", report["error"])
+
+
+class InstallKeyTests(unittest.TestCase):
+    def test_copies_the_one_password_key_into_the_keychain(self):
+        written = []
+
+        def keychain_write(key):
+            written.append(key)
+            return True
+
+        code, message = pangram.install_key(
+            op_read=lambda: "sk-secret-value", keychain_write=keychain_write
+        )
+        self.assertEqual(code, pangram.EXIT_PASS)
+        self.assertEqual(written, ["sk-secret-value"])
+        self.assertNotIn("sk-secret-value", message)
+        self.assertIn("personify-pangram-key", message)
+
+    def test_an_unreadable_one_password_prints_the_manual_command(self):
+        written = []
+        code, message = pangram.install_key(
+            op_read=failing_op, keychain_write=lambda k: written.append(k) or True
+        )
+        self.assertEqual(code, pangram.EXIT_UNAVAILABLE)
+        self.assertEqual(written, [])
+        self.assertIn("op read", message)
+        self.assertTrue(message.rstrip().endswith("-s personify-pangram-key -w"))
+
+    def test_a_failed_keychain_write_prints_the_manual_command(self):
+        code, message = pangram.install_key(
+            op_read=lambda: "sk-secret-value", keychain_write=lambda _key: False
+        )
+        self.assertEqual(code, pangram.EXIT_UNAVAILABLE)
+        self.assertNotIn("sk-secret-value", message)
+        self.assertTrue(message.rstrip().endswith("-s personify-pangram-key -w"))
+
+
+class KeychainTests(unittest.TestCase):
+    """The real Keychain calls, with `security` itself always faked."""
+
+    def setUp(self):
+        which = mock.patch.object(
+            pangram.shutil, "which", return_value="/usr/bin/security"
+        )
+        which.start()
+        self.addCleanup(which.stop)
+
+    def test_reads_the_named_item_for_the_current_user(self):
+        completed = subprocess.CompletedProcess(
+            ["security"], 0, stdout="sk-from-keychain\n", stderr=""
+        )
+        with mock.patch.object(
+            pangram.subprocess, "run", return_value=completed
+        ) as run:
+            self.assertEqual(pangram.read_keychain_secret(), "sk-from-keychain")
+        argv = run.call_args.args[0]
+        self.assertEqual(
+            argv,
+            [
+                "security",
+                "find-generic-password",
+                "-a",
+                pangram.keychain_account(),
+                "-s",
+                "personify-pangram-key",
+                "-w",
+            ],
+        )
+        self.assertEqual(
+            run.call_args.kwargs["timeout"], pangram.KEYCHAIN_TIMEOUT_SECONDS
+        )
+
+    def test_a_missing_item_resolves_to_nothing(self):
+        completed = subprocess.CompletedProcess(
+            ["security"], 44, stdout="", stderr="could not be found"
+        )
+        with mock.patch.object(pangram.subprocess, "run", return_value=completed):
+            self.assertIsNone(pangram.read_keychain_secret())
+
+    def test_a_timeout_resolves_to_nothing(self):
+        with mock.patch.object(
+            pangram.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired("security", 5),
+        ):
+            self.assertIsNone(pangram.read_keychain_secret())
+
+    def test_no_security_binary_skips_the_keychain(self):
+        with mock.patch.object(pangram.shutil, "which", return_value=None):
+            with mock.patch.object(pangram.subprocess, "run") as run:
+                self.assertIsNone(pangram.read_keychain_secret())
+                self.assertFalse(pangram.write_keychain_secret("sk"))
+        run.assert_not_called()
+
+    def test_write_updates_the_item_in_place(self):
+        completed = subprocess.CompletedProcess(["security"], 0, stdout="", stderr="")
+        with mock.patch.object(
+            pangram.subprocess, "run", return_value=completed
+        ) as run:
+            self.assertTrue(pangram.write_keychain_secret("sk-new"))
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[:2], ["security", "add-generic-password"])
+        self.assertIn("-U", argv)
+        self.assertEqual(argv[-2:], ["-w", "sk-new"])
+
+    def test_a_failed_write_reports_false(self):
+        completed = subprocess.CompletedProcess(["security"], 1, stdout="", stderr="")
+        with mock.patch.object(pangram.subprocess, "run", return_value=completed):
+            self.assertFalse(pangram.write_keychain_secret("sk-new"))
 
 
 class LengthFloorTests(unittest.TestCase):
@@ -610,6 +782,49 @@ class CommandLineTests(unittest.TestCase):
         # Assert which branch fired, so the test cannot pass for the wrong
         # reason (a network error, say, rather than the missing credential).
         self.assertIn("no Pangram API key", payload["error"])
+
+    def run_flag(self, flag, env_overrides=None):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        empty_path = pathlib.Path(directory.name) / "empty-bin"
+        empty_path.mkdir()
+        # Empty PATH: neither `op` nor `security` is reachable from a test.
+        env = {
+            "PATH": str(empty_path),
+            "HOME": directory.name,
+            "XDG_CONFIG_HOME": directory.name,
+        }
+        env.update(env_overrides or {})
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), flag],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            env=env,
+            timeout=30,
+        )
+
+    def test_check_key_without_a_key_exits_unavailable_loudly(self):
+        result = self.run_flag("--check-key")
+        self.assertEqual(result.returncode, pangram.EXIT_UNAVAILABLE)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "UNAVAILABLE")
+        self.assertIn("--install-key", payload["error"])
+        self.assertIn(b"no Pangram API key", result.stderr)
+
+    def test_check_key_with_a_key_exits_zero_and_never_prints_it(self):
+        result = self.run_flag("--check-key", {"PANGRAM_API_KEY": "sk-cli-secret"})
+        self.assertEqual(result.returncode, pangram.EXIT_PASS)
+        self.assertEqual(json.loads(result.stdout), {"status": "KEY_OK"})
+        self.assertNotIn(b"sk-cli-secret", result.stdout + result.stderr)
+
+    def test_install_key_without_op_prints_the_manual_command(self):
+        result = self.run_flag("--install-key")
+        self.assertEqual(result.returncode, pangram.EXIT_UNAVAILABLE)
+        self.assertIn(
+            b"security add-generic-password -U -a \"$(id -un)\" "
+            b"-s personify-pangram-key -w",
+            result.stderr,
+        )
 
     def test_arguments_are_rejected(self):
         result = subprocess.run(

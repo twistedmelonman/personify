@@ -3,26 +3,29 @@ import { mergeConfig } from "../src/desktop-config.js";
 
 describe("mergeConfig", () => {
   it("creates mcpServers.personify when the config is empty", () => {
-    const result = mergeConfig({}, "/abs/path/to/dist/index.js");
+    const result = mergeConfig({}, "/abs/path/to/mcp-server/bin/personify-mcp");
 
     expect(result).toEqual({
       mcpServers: {
         personify: {
-          command: "node",
-          args: ["/abs/path/to/dist/index.js"],
+          command: "/abs/path/to/mcp-server/bin/personify-mcp",
+          args: [],
         },
       },
     });
   });
 
   it("creates mcpServers.personify when the config file did not exist (undefined input)", () => {
-    const result = mergeConfig(undefined, "/abs/path/to/dist/index.js");
+    const result = mergeConfig(
+      undefined,
+      "/abs/path/to/mcp-server/bin/personify-mcp",
+    );
 
     expect(result).toEqual({
       mcpServers: {
         personify: {
-          command: "node",
-          args: ["/abs/path/to/dist/index.js"],
+          command: "/abs/path/to/mcp-server/bin/personify-mcp",
+          args: [],
         },
       },
     });
@@ -39,7 +42,10 @@ describe("mergeConfig", () => {
       },
     };
 
-    const result = mergeConfig(existing, "/abs/path/to/dist/index.js");
+    const result = mergeConfig(
+      existing,
+      "/abs/path/to/mcp-server/bin/personify-mcp",
+    );
 
     expect(result).toEqual({
       mcpServers: {
@@ -49,14 +55,14 @@ describe("mergeConfig", () => {
           env: { INSTAPAPER_CONSUMER_KEY: "secret-key-value" },
         },
         personify: {
-          command: "node",
-          args: ["/abs/path/to/dist/index.js"],
+          command: "/abs/path/to/mcp-server/bin/personify-mcp",
+          args: [],
         },
       },
     });
   });
 
-  it("updates an existing personify entry in place (idempotent path change)", () => {
+  it("migrates an old node + dist/index.js entry to the launcher, with no args", () => {
     const existing = {
       mcpServers: {
         personify: {
@@ -66,13 +72,13 @@ describe("mergeConfig", () => {
       },
     };
 
-    const result = mergeConfig(existing, "/new/path/dist/index.js");
+    const result = mergeConfig(existing, "/new/path/bin/personify-mcp");
 
     expect(result).toEqual({
       mcpServers: {
         personify: {
-          command: "node",
-          args: ["/new/path/dist/index.js"],
+          command: "/new/path/bin/personify-mcp",
+          args: [],
         },
       },
     });
@@ -85,13 +91,16 @@ describe("mergeConfig", () => {
       preferences: { menuBarEnabled: false, nested: { a: 1, b: [1, 2, 3] } },
     };
 
-    const result = mergeConfig(existing, "/abs/path/to/dist/index.js");
+    const result = mergeConfig(
+      existing,
+      "/abs/path/to/mcp-server/bin/personify-mcp",
+    );
 
     expect(result).toEqual({
       mcpServers: {
         personify: {
-          command: "node",
-          args: ["/abs/path/to/dist/index.js"],
+          command: "/abs/path/to/mcp-server/bin/personify-mcp",
+          args: [],
         },
       },
       coworkUserFilesPath: "/Users/someone/Claude",
@@ -104,8 +113,14 @@ describe("mergeConfig", () => {
       mcpServers: { instapaper: { command: "node", args: ["/x/index.js"] } },
     };
 
-    const first = mergeConfig(existing, "/abs/path/to/dist/index.js");
-    const second = mergeConfig(first, "/abs/path/to/dist/index.js");
+    const first = mergeConfig(
+      existing,
+      "/abs/path/to/mcp-server/bin/personify-mcp",
+    );
+    const second = mergeConfig(
+      first,
+      "/abs/path/to/mcp-server/bin/personify-mcp",
+    );
 
     expect(second).toEqual(first);
   });
@@ -116,17 +131,22 @@ describe("mergeConfig", () => {
       coworkUserFilesPath: "/Users/someone/Claude",
     };
 
-    const result = mergeConfig(existing, "/abs/path/to/dist/index.js");
+    const result = mergeConfig(
+      existing,
+      "/abs/path/to/mcp-server/bin/personify-mcp",
+    );
 
     expect(Object.keys(result)).toEqual(["mcpServers", "coworkUserFilesPath"]);
   });
 
   it("throws a clear error when the existing config's top level is not an object", () => {
-    expect(() => mergeConfig([1, 2, 3], "/abs/path/to/dist/index.js")).toThrow(
+    expect(() =>
+      mergeConfig([1, 2, 3], "/abs/path/to/mcp-server/bin/personify-mcp"),
+    ).toThrow(
       "claude_desktop_config.json does not contain a valid JSON object at its top level",
     );
     expect(() =>
-      mergeConfig("not an object", "/abs/path/to/dist/index.js"),
+      mergeConfig("not an object", "/abs/path/to/mcp-server/bin/personify-mcp"),
     ).toThrow(
       "claude_desktop_config.json does not contain a valid JSON object at its top level",
     );

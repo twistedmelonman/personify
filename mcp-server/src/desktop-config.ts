@@ -13,9 +13,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// launcherPath is bin/personify-mcp, which rebuilds dist/ when it is stale
+// and then execs the server, so Desktop never runs an out-of-date build.
 export function mergeConfig(
   existing: unknown,
-  serverEntryPath: string,
+  launcherPath: string,
 ): Record<string, unknown> {
   if (existing !== undefined && !isPlainObject(existing)) {
     throw new Error(
@@ -32,8 +34,8 @@ export function mergeConfig(
   base.mcpServers = {
     ...existingServers,
     personify: {
-      command: "node",
-      args: [serverEntryPath],
+      command: launcherPath,
+      args: [],
     },
   };
   return base;
