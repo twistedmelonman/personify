@@ -131,7 +131,7 @@ looks for it there):
 }
 ```
 
-## Known costs (accepted, not engineered around in v1)
+## Known costs (accepted, not engineered around)
 
 - Latency: each call is a cold CLI start, one model draft, and one Pangram
   check; measured at 30 to 40 s and about $0.30 of Claude usage plus $0.003
@@ -151,7 +151,7 @@ writes, not from the model's report of what it did.
 |---|---|---|---|
 | verified | the draft file exists and a stamp at `<config root>/stamps/<sha256>.json` parses, has `verdict: "Human"`, and a matching `sha256` | First block: the bytes of the draft file, nothing else | false |
 | not_verified | the draft file exists, no valid stamp | The `NOT VERIFIED` line, then the model's report, then the draft in a fence | false |
-| failed | the draft file is missing, or the CLI timed out, failed to spawn, or exited non-zero, or a precondition failed | `personify failed: <reason>`, plus the model's last output when there is one | true |
+| failed | the draft file is missing, or the CLI timed out, failed to spawn, or exited non-zero, or a precondition failed | `personify failed: <reason>`, plus the model's last output, fenced, when there is one | true |
 
 The `NOT VERIFIED` line is exactly:
 
@@ -166,61 +166,96 @@ second submission.
 `structuredContent` carries `{ outcome, sha256?, task_id?, staleness? }`,
 declared through the tool's `outputSchema`. When the result is verified, the
 first content block is exactly the stamped bytes: nothing is prepended or
-appended to it, or the text relayed would no longer be the text that was
-checked. A version-staleness note, when there is one, rides in a separate
+appended to it, or the bytes delivered would no longer be the bytes that
+were stamped. This is not necessarily every byte Pangram scored, since
+`pangram_check.py` strips markup such as fenced code before sending text to
+Pangram. A version-staleness note, when there is one, rides in a separate
 second content block and in `structuredContent.staleness`.
 
-The tool description is conditional on the outcome: output with no
-`NOT VERIFIED` line is final and should be relayed exactly as returned;
-output with that line should be shown to the reader as returned, with
+The tool description is conditional on the outcome, and only the FIRST
+content block matters for this decision: a second block, when there is one,
+is a plugin staleness note for the user, not part of the text. When the call
+did not error and that first block does not start with `NOT VERIFIED` or
+`personify failed`, it is final and should be relayed exactly as returned.
+Otherwise, whether the first block starts with `NOT VERIFIED` or
+`personify failed`, it should be shown to the reader as returned, with
 nothing in it sent, posted, or published anywhere.
 
 Each call has a 180 s budget. If it expires before the CLI finishes, the
 outcome is `failed`. The CLI's own Bash tool has a separate, shorter 120 s
 default limit, which can cut the check script off before the bridge's own
 budget does; when that happens no stamp gets written, so the result comes
-back `not_verified` rather than `verified`, never the reverse.
+back `not_verified` rather than `verified`. This is not an absolute rule,
+though: stamps are content-addressed by the sha256 of the draft bytes, so if
+an earlier call already produced a valid stamp for those exact bytes, a
+later cut-off run can still come back `verified`. That is by design, not a
+race: identical bytes were already checked and passed.
 
 ## Permissions
 
-The bridge calls `claude --print` with a six-rule allowlist and nothing
-else. Everything not covered by one of these rules is denied without a
-prompt. Each placeholder is an absolute path, so the rule starts with `//`,
-which is how Claude Code spells a filesystem-root path in a permission rule:
+The bridge calls `claude --print` with an allowlist of four to six rules,
+depending on whether a voice guide resolves and whether it is a symlink, and
+nothing else. Everything not covered by one of these rules is denied without
+a prompt. Each placeholder is an absolute path, so the rule starts with
+`//`, which is how Claude Code spells a filesystem-root path in a permission
+rule:
 
 - `Bash(python3 <installPath>/scripts/pangram_check.py:*)`, running the
   installed personify plugin's own check script.
-- `Read(/<configRoot>/**)`, the personify config directory, including where
-  the check script writes stamps.
 - `Read(/<installPath>/**)`, the installed personify plugin's own files.
-- `Read(/<voice guide realpath>)`, only present when a voice guide resolves.
+- `Read(/<voice guide path>)`, only present when a voice guide resolves.
+- `Read(/<voice guide realpath>)`, only present when the voice guide is a
+  symlink and its realpath differs from its path. Claude Code checks a Read
+  against a symlink separately from a Read against its resolved target, so a
+  symlinked guide (the usual case for `~/.config/personify/VOICE.md`) needs
+  both rules.
 - `Read(/<body.md realpath>)`, so the check can take the draft through a
   `< body.md` redirect. The CLI treats that redirect as a read of a file
   outside the working directory, and denies it without this rule.
 - `Edit(/<body.md realpath>)`, the one draft file the skill writes to. Writes
   are granted through `Edit`, not `Write`.
 
+There is deliberately no rule covering the personify config directory as a
+whole. The only thing the skill reads there is `VOICE.md`, which is granted
+above; a blanket `Read(/<configRoot>/**)` rule would also let the spawned
+model read `~/.config/personify/token`, the bridge's own OAuth token, which
+lives in the same directory.
+
+User-level Claude Code settings still load in the spawned CLI. A
+user-level allow rule you have configured separately (in
+`~/.claude/settings.json`, for example) also applies here, on top of the
+rules above; it is not sandboxed away by this allowlist.
+
 ## Manual verification checklist
 
 Run this after any change to `mcp-server/src/`, since the automated test
-suite mocks the `claude` subprocess and cannot catch real invocation drift:
+suite mocks the `claude` subprocess and cannot catch real invocation drift.
+
+`scripts/pangram_check.py` skips anything under 40 words (`WORD_FLOOR`) and
+writes no stamp for a skipped check, so a short input can never come back
+`verified`; every step below uses input at or above that floor.
 
 1. Build (`npm run build`), configure Desktop per above, fully quit and
    restart Desktop (not just start a new chat: the MCP server process is
    started per Desktop launch).
 2. In a **fresh** Desktop chat (no prior priming about personify), ask
-   Desktop to personify a short paragraph containing at least one em dash
-   and one phrase from `SKILL.md`'s pattern list (e.g. "this represents a
-   pivotal shift").
-3. Confirm: Desktop calls the `personify` tool (visible in its tool-call
-   UI), the returned text has no em dash and no inflated-significance
-   phrasing, and the result reads close to what running
-   `/personify:personify` directly in a CLI session on the same input
-   produces.
-   Also confirm the reply starts with the edited text itself, with no relay
-   instruction shown to the reader (see "What the tool returns" above). Use
-   a long, substantive input, since issue #50 reproduced on long-form
+   Desktop to personify a substantive paragraph of at least 40 words,
+   containing at least one em dash. Use a long, substantive input beyond
+   the floor where practical, since issue #50 reproduced on long-form
    drafts and not on short ones.
+3. Confirm the outcome matches one of these three shapes (see "What the
+   tool returns" above):
+   - **verified**: the reply is the edited text alone, with no em dash, no
+     `NOT VERIFIED` line, and no relay instruction shown to the reader.
+   - **not_verified**: the reply starts with the `NOT VERIFIED` line, then
+     the model's report, then the draft in a fenced block; confirm the
+     `NOT VERIFIED` label itself is visible in the Desktop UI, not silently
+     swallowed or paraphrased away.
+   - **failed**: the reply reads `personify failed: <reason>`, shown to
+     Desktop as a tool error, not as text to relay.
+   In every case, confirm Desktop calls the `personify` tool (visible in
+   its tool-call UI) and that a `not_verified` or `failed` result is never
+   sent, posted, or published anywhere by Desktop.
 4. Repeat step 2 in a second, separate fresh Desktop session to confirm no
    session-specific priming is required.
 5. Break it on purpose: temporarily rename the installed personify plugin
