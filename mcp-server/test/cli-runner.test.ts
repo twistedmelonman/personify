@@ -78,6 +78,7 @@ beforeEach(async () => {
   env = { XDG_CONFIG_HOME: xdg, PATH: process.env.PATH };
 });
 afterEach(async () => {
+  vi.useRealTimers();
   await rm(root, { recursive: true, force: true });
 });
 
@@ -96,10 +97,14 @@ async function stamp(bytes: Buffer) {
 }
 
 // Starts a run, waits for the spawn, and returns the child and its argv.
-async function start(text = "some text") {
+async function start(text = "some text", opts: { timeoutMs?: number } = {}) {
   const child = makeFakeChild();
   spawnMock.mockReturnValue(child);
-  const promise = runPersonify(text, { installedPluginsPath: installed, env });
+  const promise = runPersonify(text, {
+    installedPluginsPath: installed,
+    env,
+    ...opts,
+  });
   await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
   const [cmd, args, spawnOpts] = spawnMock.mock.calls[0];
   return {
@@ -258,6 +263,7 @@ describe("runPersonify", () => {
   it.each([
     [
       "success",
+      {},
       async (c: EventEmitter, body: string) => {
         await writeFile(body, "x\n");
         c.emit("close", 0);
@@ -265,18 +271,26 @@ describe("runPersonify", () => {
     ],
     [
       "non-zero exit",
+      {},
       async (c: EventEmitter) => {
         c.emit("close", 1);
       },
     ],
     [
+      "timeout",
+      { timeoutMs: 1 },
+      // No signal from the test: the runner's own timer fires the close.
+      async () => {},
+    ],
+    [
       "spawn error",
+      {},
       async (c: EventEmitter) => {
         c.emit("error", new Error("boom"));
       },
     ],
-  ])("removes the temp dir after %s", async (_name, finish) => {
-    const { child, promise, body } = await start();
+  ])("removes the temp dir after %s", async (_name, opts, finish) => {
+    const { child, promise, body } = await start("some text", opts);
     await finish(child, body);
     await promise;
     await expect(access(join(body, ".."))).rejects.toThrow();

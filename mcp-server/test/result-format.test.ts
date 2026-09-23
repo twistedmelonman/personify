@@ -61,13 +61,15 @@ describe("formatResult", () => {
     expect(text).toContain("````\n" + draft + "````");
   });
 
-  it("reports a failure as a tool error with the model's output when present", () => {
+  it("reports a failure as a tool error with the model's output fenced", () => {
     const r = formatResult(
       { kind: "failed", error: "timed out", report: "partial" },
       null,
     );
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toBe("personify failed: timed out\n\npartial");
+    expect(r.content[0].text).toBe(
+      "personify failed: timed out\n\n```\npartial\n```",
+    );
     expect(r.structuredContent).toEqual({ outcome: "failed" });
   });
 

@@ -86,6 +86,19 @@ describe("handlePersonifyCall", () => {
     expect(r.content[0].text).toContain("skill not found");
   });
 
+  it("fences a failure report so it cannot read as final text", async () => {
+    runPersonifyMock.mockResolvedValue({
+      kind: "failed",
+      error: "x",
+      report: "draft text",
+    });
+    const r = await handlePersonifyCall("raw");
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toBe(
+      "personify failed: x\n\n```\ndraft text\n```",
+    );
+  });
+
   it("carries no _meta relay key", async () => {
     runPersonifyMock.mockResolvedValue({
       kind: "verified",
@@ -102,5 +115,10 @@ describe("TOOL_DESCRIPTION", () => {
     expect(TOOL_DESCRIPTION).toContain("NOT VERIFIED");
     expect(TOOL_DESCRIPTION).toContain("exactly as returned");
     expect(TOOL_DESCRIPTION).toMatch(/do not send/i);
+  });
+
+  it("names the failed branch and the first-content-block rule", () => {
+    expect(TOOL_DESCRIPTION).toContain("personify failed");
+    expect(TOOL_DESCRIPTION).toContain("first content block");
   });
 });

@@ -123,8 +123,7 @@ export async function runPersonify(
   try {
     const args = buildCliArgs({
       installPath: install.installPath,
-      configRoot: root,
-      voiceGuidePath: await resolveVoiceGuide(env),
+      voiceGuide: await resolveVoiceGuide(env),
       bodyPath,
     });
     const child = await runChild(

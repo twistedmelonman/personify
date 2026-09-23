@@ -25,22 +25,26 @@ describe("resolveVoiceGuide", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("prefers PERSONIFY_VOICE and returns its realpath", async () => {
+  it("prefers PERSONIFY_VOICE and returns both its path and its realpath", async () => {
     const target = join(dir, "real.md");
+    const link = join(dir, "link.md");
     await writeFile(target, "voice");
-    await symlink(target, join(dir, "link.md"));
-    expect(
-      await resolveVoiceGuide({ PERSONIFY_VOICE: join(dir, "link.md") }),
-    ).toBe(target);
+    await symlink(target, link);
+    expect(await resolveVoiceGuide({ PERSONIFY_VOICE: link })).toEqual({
+      path: link,
+      realpath: target,
+    });
   });
 
   it("uses <configRoot>/VOICE.md when PERSONIFY_VOICE is unset", async () => {
     const root = join(dir, "personify");
     await import("node:fs/promises").then((fs) => fs.mkdir(root));
-    await writeFile(join(root, "VOICE.md"), "voice");
-    expect(await resolveVoiceGuide({ XDG_CONFIG_HOME: dir })).toBe(
-      join(root, "VOICE.md"),
-    );
+    const guide = join(root, "VOICE.md");
+    await writeFile(guide, "voice");
+    expect(await resolveVoiceGuide({ XDG_CONFIG_HOME: dir })).toEqual({
+      path: guide,
+      realpath: guide,
+    });
   });
 
   it("returns null for a missing file or a dangling symlink", async () => {

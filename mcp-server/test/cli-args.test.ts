@@ -3,8 +3,7 @@ import { buildCliArgs, buildInstruction } from "../src/cli-args.js";
 
 const base = {
   installPath: "/plug/2.0.0",
-  configRoot: "/home/u/.config/personify",
-  voiceGuidePath: "/repo/VOICE.md",
+  voiceGuide: { path: "/repo/link.md", realpath: "/repo/real.md" },
   bodyPath: "/private/tmp/p-1/body.md",
 };
 
@@ -22,24 +21,42 @@ describe("buildCliArgs", () => {
     ]);
   });
 
-  // Measured 2026-09-23: with only the Edit rule, the CLI wrote body.md but
-  // denied the check's `< body.md` redirect, which is checked as a Read of a
-  // file outside the working directory. No check ran, so no stamp.
-  it("allows exactly the six measured rules", () => {
+  // configRoot is never named in a rule any more: the only thing the skill
+  // reads under it is VOICE.md, and that is granted by its own path/realpath
+  // rules below, not by a blanket rule that would also expose the token.
+  it("allows the path and realpath of a symlinked voice guide", () => {
     expect(buildCliArgs(base).slice(5)).toEqual([
       "Bash(python3 /plug/2.0.0/scripts/pangram_check.py:*)",
-      "Read(//home/u/.config/personify/**)",
       "Read(//plug/2.0.0/**)",
-      "Read(//repo/VOICE.md)",
+      "Read(//repo/link.md)",
+      "Read(//repo/real.md)",
       "Read(//private/tmp/p-1/body.md)",
       "Edit(//private/tmp/p-1/body.md)",
     ]);
   });
 
-  it("omits the voice guide rule when no guide resolved", () => {
-    const rules = buildCliArgs({ ...base, voiceGuidePath: null }).slice(5);
-    expect(rules).toHaveLength(5);
-    expect(rules.some((r) => r.includes("VOICE"))).toBe(false);
+  it("does not duplicate the rule when the voice guide is not a symlink", () => {
+    const rules = buildCliArgs({
+      ...base,
+      voiceGuide: { path: "/repo/real.md", realpath: "/repo/real.md" },
+    }).slice(5);
+    expect(rules).toEqual([
+      "Bash(python3 /plug/2.0.0/scripts/pangram_check.py:*)",
+      "Read(//plug/2.0.0/**)",
+      "Read(//repo/real.md)",
+      "Read(//private/tmp/p-1/body.md)",
+      "Edit(//private/tmp/p-1/body.md)",
+    ]);
+  });
+
+  it("omits both voice guide rules when no guide resolved", () => {
+    const rules = buildCliArgs({ ...base, voiceGuide: null }).slice(5);
+    expect(rules).toEqual([
+      "Bash(python3 /plug/2.0.0/scripts/pangram_check.py:*)",
+      "Read(//plug/2.0.0/**)",
+      "Read(//private/tmp/p-1/body.md)",
+      "Edit(//private/tmp/p-1/body.md)",
+    ]);
   });
 
   it("never passes --permission-mode", () => {
@@ -50,6 +67,32 @@ describe("buildCliArgs", () => {
     expect(() => buildCliArgs({ ...base, bodyPath: "body.md" })).toThrow(
       /absolute/,
     );
+  });
+
+  it("names no rule with the config root, only the voice guide path itself", () => {
+    const rules = buildCliArgs(base).slice(5);
+    for (const rule of rules) {
+      if (rule.endsWith("/**)")) {
+        expect(rule).toBe("Read(//plug/2.0.0/**)");
+      }
+    }
+  });
+
+  // Regression for the config-root leak this replaces: a rule naming the
+  // config directory would also cover the bridge's own OAuth token file,
+  // which sits next to VOICE.md there.
+  it("never emits a rule scoped to the config directory, even when the guide lives there", () => {
+    const rules = buildCliArgs({
+      ...base,
+      voiceGuide: {
+        path: "/home/u/.config/personify/VOICE.md",
+        realpath: "/home/u/dotfiles/VOICE.md",
+      },
+    }).slice(5);
+    const configRules = rules.filter((r) =>
+      r.includes("/home/u/.config/personify"),
+    );
+    expect(configRules).toEqual(["Read(//home/u/.config/personify/VOICE.md)"]);
   });
 });
 

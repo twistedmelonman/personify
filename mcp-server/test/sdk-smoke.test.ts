@@ -88,6 +88,7 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
     const client = await connectedClient();
+    await client.listTools();
 
     const result = await client.callTool({
       name: "personify",
@@ -107,6 +108,7 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
     const client = await connectedClient();
+    await client.listTools();
 
     const result = await client.callTool({
       name: "personify",
@@ -127,6 +129,7 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
     const client = await connectedClient();
+    await client.listTools();
     const result = await client.callTool({
       name: "personify",
       arguments: { text: "raw" },

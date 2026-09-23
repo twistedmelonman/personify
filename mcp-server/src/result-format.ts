@@ -69,7 +69,9 @@ export function formatResult(
     };
   }
 
-  const report = outcome.report ? `\n\n${outcome.report}` : "";
+  // A failed report can hold the model's whole draft, so it is fenced like
+  // the not-verified draft above: without a fence it could read as final text.
+  const report = outcome.report ? `\n\n${fence(outcome.report)}` : "";
   return {
     isError: true,
     content: [
