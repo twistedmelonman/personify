@@ -1,12 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+  DEFAULT_INSTALLED_PLUGINS_PATH,
+  readInstalledEntry,
+} from "./install-locator.js";
 import type { VersionCheckResult } from "./types.js";
-
-const DEFAULT_INSTALLED_PLUGINS_PATH = join(
-  homedir(),
-  ".claude/plugins/installed_plugins.json",
-);
 
 // personify is installed from a custom github-sourced marketplace, not the
 // curated claude-plugins-official marketplace. Confirmed by direct inspection
@@ -42,15 +41,13 @@ export async function checkPersonifyVersion(
     opts.marketplaceManifestPath ?? DEFAULT_MARKETPLACE_MANIFEST_PATH;
 
   try {
-    const [installedRaw, manifestRaw] = await Promise.all([
-      readFile(installedPath, "utf8"),
+    const [entry, manifestRaw] = await Promise.all([
+      readInstalledEntry(installedPath),
       readFile(manifestPath, "utf8"),
     ]);
-    const installed = JSON.parse(installedRaw);
     const manifest = JSON.parse(manifestRaw);
 
-    const installedEntry = installed?.plugins?.["personify@personify"]?.[0];
-    const installedVersion: string | undefined = installedEntry?.version;
+    const installedVersion: string | undefined = entry?.version;
 
     // manifest here is the marketplace's own plugin.json manifest, whose
     // top-level `version` field is the latest published version.
