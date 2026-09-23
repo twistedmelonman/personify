@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 2.0.0
+version: 2.0.1
 description: Draft in your own register, then check the result against a detector before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Submits the result to Pangram and stops when the verdict is not Human, rather than editing toward a score. Also carries the structural rules for GitHub PR descriptions and code comments, which no detector can see. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
