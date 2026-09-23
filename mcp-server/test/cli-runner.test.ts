@@ -1,18 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
+import {
+  mkdtemp,
+  rm,
+  writeFile,
+  mkdir,
+  realpath,
+  access,
+  symlink,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createHash } from "node:crypto";
 
 const spawnMock = vi.fn();
 vi.mock("node:child_process", () => ({
   spawn: (...args: unknown[]) => spawnMock(...args),
 }));
-
 const loadOAuthTokenMock = vi.fn();
 vi.mock("../src/token.js", () => ({
   loadOAuthToken: (...args: unknown[]) => loadOAuthTokenMock(...args),
 }));
 
-const { runPersonify, DEFAULT_TIMEOUT_MS } =
+const { runPersonify, parseReport, DEFAULT_TIMEOUT_MS } =
   await import("../src/cli-runner.js");
 
 function makeFakeChild() {
@@ -38,240 +49,292 @@ function makeFakeChild() {
   return child;
 }
 
-describe("runPersonify", () => {
-  beforeEach(() => {
-    spawnMock.mockReset();
-    loadOAuthTokenMock.mockReset();
-    loadOAuthTokenMock.mockResolvedValue({
-      ok: true,
-      token: "sk-ant-oat01-test",
-    });
+let root: string;
+let installed: string;
+let installPath: string;
+let xdg: string;
+let env: NodeJS.ProcessEnv;
+
+beforeEach(async () => {
+  spawnMock.mockReset();
+  loadOAuthTokenMock.mockReset();
+  loadOAuthTokenMock.mockResolvedValue({
+    ok: true,
+    token: "sk-ant-oat01-test",
   });
+  root = await realpath(await mkdtemp(join(tmpdir(), "runner-")));
+  installPath = join(root, "install");
+  await mkdir(join(installPath, "scripts"), { recursive: true });
+  await writeFile(join(installPath, "scripts", "pangram_check.py"), "");
+  installed = join(root, "installed_plugins.json");
+  await writeFile(
+    installed,
+    JSON.stringify({
+      plugins: { "personify@personify": [{ installPath, version: "2.0.0" }] },
+    }),
+  );
+  xdg = join(root, "xdg");
+  await mkdir(join(xdg, "personify", "stamps"), { recursive: true });
+  env = { XDG_CONFIG_HOME: xdg, PATH: process.env.PATH };
+});
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true });
+});
 
-  it("spawns claude with a fixed argv, shell disabled, and writes text to stdin (no interpolation)", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
+function bodyPathFrom(args: string[]): string {
+  const rule = args.find((a) => a.startsWith("Edit(/"))!;
+  return rule.slice("Edit(/".length, -1);
+}
 
-    const resultPromise = runPersonify("some — text with an em dash");
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
-    const [cmd, args, spawnOpts] = spawnMock.mock.calls[0];
+async function stamp(bytes: Buffer) {
+  const sha = createHash("sha256").update(bytes).digest("hex");
+  await writeFile(
+    join(xdg, "personify", "stamps", `${sha}.json`),
+    JSON.stringify({ sha256: sha, verdict: "Human", task_id: "t-9" }),
+  );
+  return sha;
+}
+
+// Starts a run, waits for the spawn, and returns the child and its argv.
+async function start(text = "some text") {
+  const child = makeFakeChild();
+  spawnMock.mockReturnValue(child);
+  const promise = runPersonify(text, { installedPluginsPath: installed, env });
+  await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+  const [cmd, args, spawnOpts] = spawnMock.mock.calls[0];
+  return {
+    child,
+    promise,
+    cmd,
+    args: args as string[],
+    spawnOpts,
+    body: bodyPathFrom(args as string[]),
+  };
+}
+
+const json = (result: string) => JSON.stringify({ type: "result", result });
+
+describe("runPersonify", () => {
+  // No cwd: Claude Code keys session transcripts by cwd under
+  // ~/.claude/projects/, so a fresh temp dir as cwd would leave one new
+  // project directory per call (observed after the 2026-09-22 spike).
+  it("spawns claude without a shell or a cwd, text on stdin only", async () => {
+    const { child, promise, cmd, args, spawnOpts } =
+      await start("secret — text");
     expect(cmd).toBe("claude");
-    expect(args).toEqual([
-      "--print",
-      "--permission-mode",
-      "auto",
-      expect.stringContaining("personify:personify"),
-    ]);
-    // The user text must never appear inside argv — only on stdin.
-    for (const arg of args as string[]) {
-      expect(arg).not.toContain("some — text with an em dash");
-    }
+    for (const arg of args) expect(arg).not.toContain("secret — text");
     expect(spawnOpts).toMatchObject({
       shell: false,
       env: expect.objectContaining({
         CLAUDE_CODE_OAUTH_TOKEN: "sk-ant-oat01-test",
       }),
     });
-    expect(child.stdin.write).toHaveBeenCalledWith(
-      "some — text with an em dash",
-    );
-    expect(child.stdin.end).toHaveBeenCalled();
-
-    child.stdout.emit("data", Buffer.from("some, text with an em dash"));
-    child.emit("close", 0);
-
-    const result = await resultPromise;
-    expect(result).toEqual({ ok: true, text: "some, text with an em dash" });
+    expect(spawnOpts).not.toHaveProperty("cwd");
+    expect(child.stdin.write).toHaveBeenCalledWith("secret — text");
+    child.emit("close", 1);
+    await promise;
   });
 
-  // twistedmelonman/personify#50: PERSONIFY_INSTRUCTION already said "no
-  // commentary, no preamble" and the CLI model emitted one anyway, so the
-  // stripping pass runs on stdout rather than trusting the prompt.
-  it("strips a leaked commentary preamble from CLI stdout", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
-
-    const resultPromise = runPersonify("draft text");
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
-    child.stdout.emit(
-      "data",
-      Buffer.from(
-        "This is an RFC/proposal document, long-form work writing, so I'll apply the voice guide's fingerprint and work-register rules.\n\nHere's the rewrite:\n\n# RFC: Personal Token Rollover\n\nEvery month my unused tokens evaporate.\n",
-      ),
-    );
-    child.emit("close", 0);
-
-    const result = await resultPromise;
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text.startsWith("# RFC: Personal Token Rollover")).toBe(
-        true,
-      );
-      expect(result.text).not.toContain("so I'll apply");
-      expect(result.text).not.toContain("Here's the rewrite:");
-      expect(result.text).toContain("Every month my unused tokens evaporate.");
+  // Review focus 1: os.tmpdir() on macOS is a symlink, and the Edit rule has
+  // to name the real path or the CLI denies the write. TMPDIR points at a
+  // symlink made here, so this fails on Linux CI too if realpath is dropped.
+  it("names the realpath of the temp dir in the Edit rule", async () => {
+    const realTmp = join(root, "real-tmp");
+    const linkTmp = join(root, "link-tmp");
+    await mkdir(realTmp);
+    await symlink(realTmp, linkTmp);
+    const saved = process.env.TMPDIR;
+    process.env.TMPDIR = linkTmp;
+    try {
+      const { child, promise, body } = await start();
+      expect(body.startsWith(`${realTmp}/`)).toBe(true);
+      child.emit("close", 1);
+      await promise;
+    } finally {
+      if (saved === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = saved;
     }
   });
 
-  // twistedmelonman/personify#86: the step 5 status line is presentation for a
-  // person at a terminal, and an agent calling this bridge pastes whatever it
-  // gets into a PR body.
-  it("strips the step 5 status line in default mode", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
-
-    const resultPromise = runPersonify("draft text");
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
-    child.stdout.emit(
-      "data",
-      Buffer.from(
-        "Gives `deploy-bot` assume-role on `ci-release`.\n\n[arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]\n",
-      ),
-    );
+  it("returns verified with the file bytes when a Human stamp matches", async () => {
+    const { child, promise, body } = await start();
+    const bytes = Buffer.from("Final text.\n", "utf8");
+    await writeFile(body, bytes);
+    const sha = await stamp(bytes);
+    child.stdout.emit("data", Buffer.from(json("Passed.")));
     child.emit("close", 0);
-
-    const result = await resultPromise;
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toBe(
-        "Gives `deploy-bot` assume-role on `ci-release`.",
-      );
-      expect(result.text).not.toContain("arm B primary");
-      expect(result.text).not.toContain("evidence:");
-    }
+    expect(await promise).toEqual({
+      kind: "verified",
+      text: "Final text.\n",
+      sha256: sha,
+      taskId: "t-9",
+    });
   });
 
-  // "both" mode asked for the comparison, so the status line and the arm
-  // reports are the payload rather than exhaust.
-  it("keeps the status line in both mode", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
-
-    const resultPromise = runPersonify("draft text", { mode: "both" });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
-    child.stdout.emit(
-      "data",
-      Buffer.from(
-        "Gives `deploy-bot` assume-role on `ci-release`.\n\n[arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]\n",
-      ),
-    );
+  it("returns not_verified with the model's report when no stamp exists", async () => {
+    const { child, promise, body } = await start();
+    await writeFile(body, "Draft.\n");
+    child.stdout.emit("data", Buffer.from(json("Verdict AI, 1.0.")));
     child.emit("close", 0);
-
-    const result = await resultPromise;
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toContain("arm B primary");
-      expect(result.text).toContain("evidence: 2026-08-31T09-14-22");
-    }
+    const outcome = await promise;
+    expect(outcome).toMatchObject({
+      kind: "not_verified",
+      draft: "Draft.\n",
+      report: "Verdict AI, 1.0.",
+    });
   });
 
-  it("maps non-zero exit code to a CliResult error including stderr", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
+  // Review focus 3: stamps follow XDG_CONFIG_HOME, as the script writes them.
+  it("looks for stamps under XDG_CONFIG_HOME", async () => {
+    const { child, promise, body } = await start();
+    const bytes = Buffer.from("Final.\n");
+    await writeFile(body, bytes);
+    await stamp(bytes);
+    child.emit("close", 0);
+    expect((await promise).kind).toBe("verified");
+  });
 
-    const resultPromise = runPersonify("text");
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+  // Review focus 4: the outcome comes from the file and stamp, not stdout.
+  it("falls back to raw stdout as the report when it is not JSON", async () => {
+    const { child, promise, body } = await start();
+    await writeFile(body, "Draft.\n");
+    child.stdout.emit("data", Buffer.from("plain words\n"));
+    child.emit("close", 0);
+    expect(await promise).toMatchObject({
+      kind: "not_verified",
+      report: "plain words",
+    });
+  });
+
+  it("fails when the CLI exits 0 without writing the file", async () => {
+    const { child, promise } = await start();
+    child.stdout.emit("data", Buffer.from(json("Permission denied.")));
+    child.emit("close", 0);
+    expect(await promise).toMatchObject({
+      kind: "failed",
+      report: "Permission denied.",
+    });
+  });
+
+  it("fails on a non-zero exit with stderr in the error", async () => {
+    const { child, promise } = await start();
     child.stderr.emit("data", Buffer.from("skill not found"));
     child.emit("close", 1);
-
-    const result = await resultPromise;
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("skill not found");
-      expect(result.error).toContain("exit code 1");
+    const outcome = await promise;
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed") {
+      expect(outcome.error).toContain("exit code 1");
+      expect(outcome.error).toContain("skill not found");
     }
   });
 
-  it("times out a hung subprocess and kills it", async () => {
+  it("times out, kills the child, and fails", async () => {
     vi.useFakeTimers();
     const child = makeFakeChild();
     spawnMock.mockReturnValue(child);
-
-    const resultPromise = runPersonify("text", { timeoutMs: 1000 });
+    const promise = runPersonify("text", {
+      installedPluginsPath: installed,
+      env,
+      timeoutMs: 1000,
+    });
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(1000);
-
-    const result = await resultPromise;
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("timed out");
-    }
-    expect(child.kill).toHaveBeenCalled();
     vi.useRealTimers();
+    const outcome = await promise;
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed") expect(outcome.error).toContain("timed out");
+    expect(child.kill).toHaveBeenCalled();
   });
 
-  it("swallows an EPIPE error on stdin instead of throwing or hanging", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
+  it("fails on a spawn error", async () => {
+    const { child, promise } = await start();
+    child.emit("error", new Error("ENOENT"));
+    const outcome = await promise;
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed")
+      expect(outcome.error).toContain("failed to spawn claude CLI");
+  });
 
-    const resultPromise = runPersonify("some text");
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
+  it.each([
+    [
+      "success",
+      async (c: EventEmitter, body: string) => {
+        await writeFile(body, "x\n");
+        c.emit("close", 0);
+      },
+    ],
+    [
+      "non-zero exit",
+      async (c: EventEmitter) => {
+        c.emit("close", 1);
+      },
+    ],
+    [
+      "spawn error",
+      async (c: EventEmitter) => {
+        c.emit("error", new Error("boom"));
+      },
+    ],
+  ])("removes the temp dir after %s", async (_name, finish) => {
+    const { child, promise, body } = await start();
+    await finish(child, body);
+    await promise;
+    await expect(access(join(body, ".."))).rejects.toThrow();
+  });
 
-    // Simulate the child exiting before stdin drains: an EPIPE error event
-    // fires on child.stdin. This must not become an uncaught exception.
+  it("swallows EPIPE on stdin", async () => {
+    const { child, promise } = await start();
     child.stdin.emit(
       "error",
       Object.assign(new Error("EPIPE"), { code: "EPIPE" }),
     );
     child.emit("close", 1);
-
-    const result = await resultPromise;
-    expect(result.ok).toBe(false);
+    expect((await promise).kind).toBe("failed");
   });
 
-  it("rejects empty input before spawning a subprocess", async () => {
-    const result = await runPersonify("   ");
-    expect(result).toEqual({ ok: false, error: "no text provided" });
+  it("rejects empty input before spawning", async () => {
+    const outcome = await runPersonify("   ", {
+      installedPluginsPath: installed,
+      env,
+    });
+    expect(outcome).toEqual({ kind: "failed", error: "no text provided" });
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it("returns a tool error without spawning when the token cannot be loaded", async () => {
+  it("fails before spawning when the plugin is not installed", async () => {
+    const outcome = await runPersonify("text", {
+      installedPluginsPath: join(root, "absent.json"),
+      env,
+    });
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed")
+      expect(outcome.error).toContain("not installed");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("fails before spawning when the token cannot be loaded", async () => {
     loadOAuthTokenMock.mockResolvedValue({
       ok: false,
-      error: 'no OAuth token found at /fake/token. Run "claude setup-token"...',
+      error: "no OAuth token found",
     });
-
-    const result = await runPersonify("some text");
-
-    expect(result).toEqual({
-      ok: false,
-      error: 'no OAuth token found at /fake/token. Run "claude setup-token"...',
+    const outcome = await runPersonify("text", {
+      installedPluginsPath: installed,
+      env,
     });
+    expect(outcome).toEqual({ kind: "failed", error: "no OAuth token found" });
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the 180s budget", () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(180_000);
   });
 });
 
-describe("runPersonify modes", () => {
-  beforeEach(() => {
-    spawnMock.mockReset();
-    loadOAuthTokenMock.mockReset();
-    loadOAuthTokenMock.mockResolvedValue({ ok: true, token: "t" });
+describe("parseReport", () => {
+  it("reads result from the CLI's JSON output", () => {
+    expect(parseReport(json("hello"))).toBe("hello");
   });
-
-  it("passes the show-both instruction when mode is both", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
-    const promise = runPersonify("hello", { mode: "both" });
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
-    child.stdout.emit("data", Buffer.from("out"));
-    child.emit("close", 0);
-    await promise;
-    const args = spawnMock.mock.calls[0][1] as string[];
-    expect(args.join(" ")).toContain("show both");
-  });
-
-  it("omits the show-both instruction by default", async () => {
-    const child = makeFakeChild();
-    spawnMock.mockReturnValue(child);
-    const promise = runPersonify("hello");
-    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
-    child.stdout.emit("data", Buffer.from("out"));
-    child.emit("close", 0);
-    await promise;
-    const args = spawnMock.mock.calls[0][1] as string[];
-    expect(args.join(" ")).not.toContain("show both");
-  });
-
-  it("allows more than 30s, since two arms plus review exceed it", async () => {
-    expect(DEFAULT_TIMEOUT_MS).toBeGreaterThanOrEqual(120_000);
+  it("falls back to trimmed stdout", () => {
+    expect(parseReport("  not json \n")).toBe("not json");
   });
 });

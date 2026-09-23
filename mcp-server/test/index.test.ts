@@ -2,107 +2,105 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const runPersonifyMock = vi.fn();
 const checkPersonifyVersionMock = vi.fn();
-
 vi.mock("../src/cli-runner.js", () => ({
   runPersonify: (...args: unknown[]) => runPersonifyMock(...args),
 }));
 vi.mock("../src/version-check.js", () => ({
   checkPersonifyVersion: (...args: unknown[]) =>
     checkPersonifyVersionMock(...args),
-  formatStalenessNote: (result: { stale: boolean }) =>
-    result.stale ? "[stale note]" : null,
+  formatStalenessNote: (r: { stale: boolean }) =>
+    r.stale ? "\n\n[stale note]" : null,
 }));
 
-const { handlePersonifyCall, VERBATIM_INSTRUCTION, INSTRUCTION_META_KEY } =
+const { handlePersonifyCall, TOOL_DESCRIPTION } =
   await import("../src/index.js");
+const { NOT_VERIFIED_LINE } = await import("../src/result-format.js");
+
+const sha = "b".repeat(64);
 
 describe("handlePersonifyCall", () => {
   beforeEach(() => {
     runPersonifyMock.mockReset();
     checkPersonifyVersionMock.mockReset();
-  });
-
-  it("returns personified text with no note when up to date", async () => {
-    runPersonifyMock.mockResolvedValue({ ok: true, text: "clean text" });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
-
-    const result = await handlePersonifyCall("raw text");
-
-    expect(result.isError).toBeFalsy();
-    expect(result.content[0].text).toBe("clean text");
   });
 
-  it("appends the staleness note when the plugin is behind", async () => {
-    runPersonifyMock.mockResolvedValue({ ok: true, text: "clean text" });
+  it("calls the runner with the text only", async () => {
+    runPersonifyMock.mockResolvedValue({
+      kind: "verified",
+      text: "t",
+      sha256: sha,
+    });
+    await handlePersonifyCall("raw");
+    expect(runPersonifyMock).toHaveBeenCalledWith("raw");
+  });
+
+  it("returns verified text alone in the first block", async () => {
+    runPersonifyMock.mockResolvedValue({
+      kind: "verified",
+      text: "Final.\n",
+      sha256: sha,
+    });
+    const r = await handlePersonifyCall("raw");
+    expect(r.isError).toBe(false);
+    expect(r.content[0]).toEqual({ type: "text", text: "Final.\n" });
+  });
+
+  it("puts a trimmed staleness note in a second block", async () => {
+    runPersonifyMock.mockResolvedValue({
+      kind: "verified",
+      text: "Final.",
+      sha256: sha,
+    });
     checkPersonifyVersionMock.mockResolvedValue({
       stale: true,
-      installed: "0.2.1",
-      latest: "0.3.0",
+      installed: "2.0.0",
+      latest: "2.1.0",
     });
-
-    const result = await handlePersonifyCall("raw text");
-
-    expect(result.isError).toBeFalsy();
-    expect(result.content[0].text).toBe("clean text[stale note]");
+    const r = await handlePersonifyCall("raw");
+    expect(r.content[0].text).toBe("Final.");
+    expect(r.content[1].text).toBe("[stale note]");
   });
 
-  // twistedmelonman/personify#50: the verbatim-relay instruction is addressed
-  // to the calling model, not to the reader. Putting it in the text content
-  // meant Desktop rendered it above every result.
-  it("keeps the verbatim-relay instruction out of the user-visible text", async () => {
-    runPersonifyMock.mockResolvedValue({ ok: true, text: "clean text" });
-    checkPersonifyVersionMock.mockResolvedValue({ stale: false });
-
-    const result = await handlePersonifyCall("raw text");
-
-    expect(result.content[0].text).not.toContain(VERBATIM_INSTRUCTION);
-    expect(result.content[0].text).not.toContain("exactly as written");
-  });
-
-  // Named for what it proves. The SDK does not forward a result's _meta into
-  // model context, so this asserts the field is set, not that anything reads it.
-  it("sets the namespaced instruction key on the result _meta", async () => {
-    runPersonifyMock.mockResolvedValue({ ok: true, text: "clean text" });
-    checkPersonifyVersionMock.mockResolvedValue({ stale: false });
-
-    const result = await handlePersonifyCall("raw text");
-
-    expect(result._meta?.[INSTRUCTION_META_KEY]).toBe(
-      VERBATIM_INSTRUCTION.trim(),
+  it("labels a not-verified draft", async () => {
+    runPersonifyMock.mockResolvedValue({
+      kind: "not_verified",
+      draft: "D.",
+      sha256: sha,
+      report: "AI.",
+    });
+    const r = await handlePersonifyCall("raw");
+    expect(r.isError).toBe(false);
+    expect((r.content[0].text as string).startsWith(NOT_VERIFIED_LINE)).toBe(
+      true,
     );
   });
 
-  // End-to-end guard for twistedmelonman/personify#50. The reported output was
-  // two separate leaks concatenated: the relay instruction prepended here, and
-  // the CLI model's own meta-commentary coming up through runPersonify. Neither
-  // may reach content[0].text.
-  it("returns only the personified text when the CLI leaks a commentary preamble", async () => {
+  it("surfaces a failure as a tool error", async () => {
     runPersonifyMock.mockResolvedValue({
-      ok: true,
-      // What runPersonify returns after its own stripping pass.
-      text: "# RFC: Personal Token Rollover\n\nEvery month my unused tokens evaporate.",
+      kind: "failed",
+      error: "skill not found",
     });
-    checkPersonifyVersionMock.mockResolvedValue({ stale: false });
-
-    const result = await handlePersonifyCall("raw text");
-
-    const text = result.content[0].text as string;
-    expect(text.startsWith("# RFC: Personal Token Rollover")).toBe(true);
-    expect(text).not.toContain("exactly as written");
-    expect(text).not.toContain("so I'll apply");
-    expect(text).not.toContain("Here's the rewrite:");
+    const r = await handlePersonifyCall("raw");
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain("skill not found");
   });
 
-  it("surfaces a CLI failure as an MCP tool error, not silent fallback text", async () => {
+  it("carries no _meta relay key", async () => {
     runPersonifyMock.mockResolvedValue({
-      ok: false,
-      error: "personify CLI exited with exit code 1: skill not found",
+      kind: "verified",
+      text: "t",
+      sha256: sha,
     });
-    checkPersonifyVersionMock.mockResolvedValue({ stale: false });
+    const r = await handlePersonifyCall("raw");
+    expect(r._meta).toBeUndefined();
+  });
+});
 
-    const result = await handlePersonifyCall("raw text");
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("skill not found");
+describe("TOOL_DESCRIPTION", () => {
+  it("covers both the final and the NOT VERIFIED branch", () => {
+    expect(TOOL_DESCRIPTION).toContain("NOT VERIFIED");
+    expect(TOOL_DESCRIPTION).toContain("exactly as returned");
+    expect(TOOL_DESCRIPTION).toMatch(/do not send/i);
   });
 });
