@@ -15,7 +15,20 @@ describe("formatResult", () => {
       outcome: "verified",
       sha256: sha,
       task_id: "t",
+      text: "Final.\n",
     });
+  });
+
+  // Desktop's model can receive only the structured copy, so it must carry
+  // the text itself, byte for byte, not just the outcome.
+  it("carries the same verified bytes in structuredContent as in content", () => {
+    const text = "Line one.\n\nLine two, kept.\n";
+    const r = formatResult(
+      { kind: "verified", text, sha256: sha },
+      "[update available]",
+    );
+    expect(r.structuredContent?.text).toBe(r.content[0].text);
+    expect(r.structuredContent?.text).toBe(text);
   });
 
   it("puts the staleness note in its own block, never in the verified text", () => {
@@ -48,6 +61,8 @@ describe("formatResult", () => {
     expect(r.structuredContent).toEqual({
       outcome: "not_verified",
       sha256: sha,
+      report: "Verdict AI.",
+      draft: "Draft.",
     });
   });
 
@@ -70,11 +85,19 @@ describe("formatResult", () => {
     expect(r.content[0].text).toBe(
       "personify failed: timed out\n\n```\npartial\n```",
     );
-    expect(r.structuredContent).toEqual({ outcome: "failed" });
+    expect(r.structuredContent).toEqual({
+      outcome: "failed",
+      error: "timed out",
+      report: "partial",
+    });
   });
 
   it("reports a failure without a report", () => {
     const r = formatResult({ kind: "failed", error: "no text provided" }, null);
     expect(r.content[0].text).toBe("personify failed: no text provided");
+    expect(r.structuredContent).toEqual({
+      outcome: "failed",
+      error: "no text provided",
+    });
   });
 });

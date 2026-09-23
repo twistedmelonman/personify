@@ -121,4 +121,15 @@ describe("TOOL_DESCRIPTION", () => {
     expect(TOOL_DESCRIPTION).toContain("personify failed");
     expect(TOOL_DESCRIPTION).toContain("first content block");
   });
+
+  // A client that shows the model only structuredContent must still be told
+  // which field holds the text for each outcome.
+  it("names the structured fields for every outcome", () => {
+    for (const field of ["outcome", "verified", "not_verified", "failed"]) {
+      expect(TOOL_DESCRIPTION).toContain(field);
+    }
+    for (const field of ["text", "report", "draft", "error"]) {
+      expect(TOOL_DESCRIPTION).toContain(`"${field}"`);
+    }
+  });
 });

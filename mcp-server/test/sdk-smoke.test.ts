@@ -98,7 +98,10 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     expect(result.isError).toBeFalsy();
     const content = result.content as Array<{ type: string; text: string }>;
     expect(content[0].text).toContain("clean text");
-    expect(result.structuredContent).toMatchObject({ outcome: "verified" });
+    expect(result.structuredContent).toMatchObject({
+      outcome: "verified",
+      text: "clean text",
+    });
   });
 
   it("surfaces a tool error over a real handshake, not a protocol-level failure", async () => {
@@ -135,6 +138,10 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
       arguments: { text: "raw" },
     });
     expect(result.isError).toBeFalsy();
-    expect(result.structuredContent).toMatchObject({ outcome: "not_verified" });
+    expect(result.structuredContent).toMatchObject({
+      outcome: "not_verified",
+      report: "AI.",
+      draft: "D.",
+    });
   });
 });

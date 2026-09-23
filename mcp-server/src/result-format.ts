@@ -4,10 +4,17 @@ import type { Outcome } from "./types.js";
 export const NOT_VERIFIED_LINE =
   "NOT VERIFIED: Pangram did not pass this text. Review it before sending.";
 
+// In a live Desktop call, a structured result holding only the outcome reached
+// the model with no content text at all. So the structured copy carries the
+// text itself, unfenced, and not only the outcome.
 export const OUTPUT_SCHEMA = {
   type: "object" as const,
   properties: {
     outcome: { type: "string", enum: ["verified", "not_verified", "failed"] },
+    text: { type: "string" },
+    report: { type: "string" },
+    draft: { type: "string" },
+    error: { type: "string" },
     sha256: { type: "string" },
     task_id: { type: "string" },
     staleness: { type: "string" },
@@ -41,6 +48,7 @@ export function formatResult(
       content: [{ type: "text", text: outcome.text }, ...noteBlock],
       structuredContent: {
         outcome: "verified",
+        text: outcome.text,
         sha256: outcome.sha256,
         ...(outcome.taskId ? { task_id: outcome.taskId } : {}),
         ...staleness,
@@ -63,6 +71,8 @@ export function formatResult(
       ],
       structuredContent: {
         outcome: "not_verified",
+        report: outcome.report,
+        draft: outcome.draft,
         sha256: outcome.sha256,
         ...staleness,
       },
@@ -78,6 +88,11 @@ export function formatResult(
       { type: "text", text: `personify failed: ${outcome.error}${report}` },
       ...noteBlock,
     ],
-    structuredContent: { outcome: "failed", ...staleness },
+    structuredContent: {
+      outcome: "failed",
+      error: outcome.error,
+      ...(outcome.report ? { report: outcome.report } : {}),
+      ...staleness,
+    },
   };
 }
