@@ -14,7 +14,7 @@ confirmed active. Claude Code CLI does not have this problem.
 
 ## Prerequisites
 
-- **Node.js >= 18** (check with `node --version`). Install via
+- **Node.js >= 20.19** (check with `node --version`). Install via
   [nodejs.org](https://nodejs.org) or `brew install node`.
 - **npm** (bundled with Node; check with `npm --version`).
 - **TypeScript compiler (`tsc`)**. `npm install` pulls in TypeScript as a
@@ -131,115 +131,131 @@ looks for it there):
 }
 ```
 
-## Known costs (accepted, not engineered around in v1)
+## Known costs (accepted, not engineered around)
 
-- Latency: each call is a cold CLI start plus a real model call. Expect
-  single-digit to tens of seconds.
+- Latency: each call is a cold CLI start, one model draft, and one Pangram
+  check; measured at 30 to 40 s and about $0.30 of Claude usage plus $0.003
+  of Pangram on 2026-09-22.
 - Requires the `claude` CLI to be installed and on `PATH` for whatever user
   account runs Desktop, with the `personify` plugin installed
   (`/plugin marketplace add twistedmelonman/personify && /plugin install personify@personify`),
   and requires the OAuth token file described above under "Authenticate."
 
-## Output handling
+## What the tool returns
 
-The tool returns only the personified text. Two things that are _not_ the
-text get kept out of it:
+The bridge runs the `personify:personify` skill through the `claude` CLI,
+then decides the outcome from the Pangram stamp the skill's own check script
+writes, not from the model's report of what it did.
 
-- The verbatim-relay instruction ("treat this as final, don't re-edit it")
-  is addressed to the calling model, so it rides in the tool description. It
-  used to be prepended to the text content, which meant Desktop printed it to
-  the reader above every result (twistedmelonman/personify#50). The result's
-  `_meta` also carries it under a vendor-namespaced key, but that is
-  best-effort only: checked against SDK 1.30.0, nothing forwards a result's
-  `_meta` into model context, so the tool description is what actually
-  delivers the instruction. Don't trim the description on the assumption
-  `_meta` covers it.
-- The CLI-side model sometimes narrates its editing plan before the text
-  ("This is long-form work writing, so I'll apply..."), or introduces it
-  with "Here's the rewrite:". `PERSONIFY_INSTRUCTION` tells it not to, and
-  that alone did not hold, so `stripCliPreamble` removes leading
-  commentary-shaped paragraphs from stdout as well.
+| Outcome | How the bridge knows | `content` | `isError` |
+|---|---|---|---|
+| verified | the draft file exists and a stamp at `<config root>/stamps/<sha256>.json` parses, has `verdict: "Human"`, and a matching `sha256` | First block: the bytes of the draft file, nothing else | false |
+| not_verified | the draft file exists, no valid stamp | The `NOT VERIFIED` line, then the model's report, then the draft in a fence | false |
+| failed | the draft file is missing, or the CLI timed out, failed to spawn, or exited non-zero, or a precondition failed | `personify failed: <reason>`, plus the model's last output, fenced, when there is one | true |
 
-The stripper is deliberately conservative, because a false positive silently
-eats the first paragraph of someone's document while a false negative just
-leaves a stray sentence they can ignore. It only considers _leading_
-paragraphs, only when at least one paragraph follows, only when the paragraph
-announces work on the text in hand, and it returns the input unchanged rather
-than ever returning empty. A wrapping code fence is unwrapped only when the
-fenced body itself leads with commentary, since a fence is often the content.
+The `NOT VERIFIED` line is exactly:
 
-Concretely, a paragraph counts as commentary only when one sentence carries
-both an editing verb and a reference to the machinery doing the editing (the
-skill, the voice guide, a register, "the text"). Either half alone is not
-enough, and both halves were tried and rejected: matching the verb alone ate
-"so I'll edit the contract tonight," and matching the machinery alone ate
-"our voice guide's rules are mostly fine," which is content, since this
-skill's own users write about the skill. Stripping is also bounded to the two
-leading paragraphs of the observed commentary-plus-handoff shape, so a false
-positive cannot cascade through a document, and every strip is logged to
-stderr so one that does fire is diagnosable. Fenced blocks are never treated
-as commentary, whatever they say: a code block that happens to read like a
-preamble is still the user's content, and unwrapping only happens when the
-fenced body contains no fence of its own, so a document that merely opens and
-closes with a code block keeps its fences balanced.
+```text
+NOT VERIFIED: Pangram did not pass this text. Review it before sending.
+```
 
-Each of those is now a regression test. If a new preamble shape shows up in
-the wild, add a fixture to `test/strip-preamble.test.ts` rather than
-loosening the patterns.
+Not verified is not an error. A draft awaiting review is a normal result,
+and `isError: true` tends to make the calling model retry, which would be a
+second submission.
 
-### The status line
+`structuredContent` carries `{ outcome, sha256?, task_id?, staleness? }`,
+declared through the tool's `outputSchema`. When the result is verified, the
+first content block is exactly the stamped bytes: nothing is prepended or
+appended to it, or the bytes delivered would no longer be the bytes that
+were stamped. This is not necessarily every byte Pangram scored, since
+`pangram_check.py` strips markup such as fenced code before sending text to
+Pangram. A version-staleness note, when there is one, rides in a separate
+second content block and in `structuredContent.staleness`.
 
-`stripStatusLine` removes the skill's own trailing status line
-(twistedmelonman/personify#86):
+The tool description is conditional on the outcome, and only the FIRST
+content block matters for this decision: a second block, when there is one,
+is a plugin staleness note for the user, not part of the text. When the call
+did not error and that first block does not start with `NOT VERIFIED` or
+`personify failed`, it is final and should be relayed exactly as returned.
+Otherwise, whether the first block starts with `NOT VERIFIED` or
+`personify failed`, it should be shown to the reader as returned, with
+nothing in it sent, posted, or published anywhere.
 
-    [arm B primary · arm A differed on 3 spans · evidence: 2026-08-31T09-14-22]
+Each call has a 180 s budget. If it expires before the CLI finishes, the
+outcome is `failed`. The CLI's own Bash tool has a separate, shorter 120 s
+default limit, which can cut the check script off before the bridge's own
+budget does; when that happens no stamp gets written, so the result comes
+back `not_verified` rather than `verified`. This is not an absolute rule,
+though: stamps are content-addressed by the sha256 of the draft bytes, so if
+an earlier call already produced a valid stamp for those exact bytes, a
+later cut-off run can still come back `verified`. That is by design, not a
+race: identical bytes were already checked and passed.
 
-That line is presentation for a person reading a result in a terminal, where it
-names the primary arm and the evidence record to hand to `show both`. It is not
-part of the text, and a caller of this bridge is by definition programmatic: an
-agent that asks for a cleaned PR description and then runs `gh pr create` would
-paste the line into the PR body.
+## Permissions
 
-Much easier than the preamble case, and the pattern is correspondingly strict
-rather than conservative. The line has a fixed shape, sits on the last line,
-and is bracketed at both ends, so an anchored full-line match has no plausible
-false positive against prose. It requires both fields in order, tolerates any
-wording in the middle field and any trailing field (which is how the
-`· 25 unconsolidated` nudge arrives), and matches the timestamp by shape
-without validating it as a date, since a malformed one is still the status line.
+The bridge calls `claude --print` with an allowlist of four to six rules,
+depending on whether a voice guide resolves and whether it is a symlink, and
+nothing else. Everything not covered by one of these rules is denied without
+a prompt. Each placeholder is an absolute path, so the rule starts with
+`//`, which is how Claude Code spells a filesystem-root path in a permission
+rule:
 
-Two deliberate non-behaviors. Only the last non-empty line is a candidate: a
-status line mid-document is the user quoting one, which this repo's own evidence
-records and regression fixtures do. And it never returns empty from non-empty
-input, so a result consisting only of a status line passes through rather than
-becoming a silent truncation, since that case means the rewrite itself went
-missing.
+- `Bash(python3 <installPath>/scripts/pangram_check.py:*)`, running the
+  installed personify plugin's own check script.
+- `Read(/<installPath>/**)`, the installed personify plugin's own files.
+- `Read(/<voice guide path>)`, only present when a voice guide resolves.
+- `Read(/<voice guide realpath>)`, only present when the voice guide is a
+  symlink and its realpath differs from its path. Claude Code checks a Read
+  against a symlink separately from a Read against its resolved target, so a
+  symlinked guide (the usual case for `~/.config/personify/VOICE.md`) needs
+  both rules.
+- `Read(/<body.md realpath>)`, so the check can take the draft through a
+  `< body.md` redirect. The CLI treats that redirect as a read of a file
+  outside the working directory, and denies it without this rule.
+- `Edit(/<body.md realpath>)`, the one draft file the skill writes to. Writes
+  are granted through `Edit`, not `Write`.
 
-`mode: "both"` is exempt. That mode asked for the full comparison, so the
-status line and the arm reports are the requested payload.
+There is deliberately no rule covering the personify config directory as a
+whole. The only thing the skill reads there is `VOICE.md`, which is granted
+above; a blanket `Read(/<configRoot>/**)` rule would also let the spawned
+model read `~/.config/personify/token`, the bridge's own OAuth token, which
+lives in the same directory.
+
+User-level Claude Code settings still load in the spawned CLI. A
+user-level allow rule you have configured separately (in
+`~/.claude/settings.json`, for example) also applies here, on top of the
+rules above; it is not sandboxed away by this allowlist.
 
 ## Manual verification checklist
 
 Run this after any change to `mcp-server/src/`, since the automated test
-suite mocks the `claude` subprocess and cannot catch real invocation drift:
+suite mocks the `claude` subprocess and cannot catch real invocation drift.
+
+`scripts/pangram_check.py` skips anything under 40 words (`WORD_FLOOR`) and
+writes no stamp for a skipped check, so a short input can never come back
+`verified`; every step below uses input at or above that floor.
 
 1. Build (`npm run build`), configure Desktop per above, fully quit and
    restart Desktop (not just start a new chat: the MCP server process is
    started per Desktop launch).
 2. In a **fresh** Desktop chat (no prior priming about personify), ask
-   Desktop to personify a short paragraph containing at least one em dash
-   and one phrase from `SKILL.md`'s pattern list (e.g. "this represents a
-   pivotal shift").
-3. Confirm: Desktop calls the `personify` tool (visible in its tool-call
-   UI), the returned text has no em dash and no inflated-significance
-   phrasing, and the result reads close to what running
-   `/personify:personify` directly in a CLI session on the same input
-   produces.
-   Also confirm the reply starts with the edited text itself: no relay
-   instruction, no "This is long-form writing, so I'll apply..." preamble,
-   and no "Here's the rewrite:" line (see "Output handling" above). Use a
-   long, substantive input, since issue #50 reproduced on long-form drafts
-   and not on short ones.
+   Desktop to personify a substantive paragraph of at least 40 words,
+   containing at least one em dash. Use a long, substantive input beyond
+   the floor where practical, since issue #50 reproduced on long-form
+   drafts and not on short ones.
+3. Confirm the outcome matches one of these three shapes (see "What the
+   tool returns" above):
+   - **verified**: the reply is the edited text alone, with no em dash, no
+     `NOT VERIFIED` line, and no relay instruction shown to the reader.
+   - **not_verified**: the reply starts with the `NOT VERIFIED` line, then
+     the model's report, then the draft in a fenced block; confirm the
+     `NOT VERIFIED` label itself is visible in the Desktop UI, not silently
+     swallowed or paraphrased away.
+   - **failed**: the reply reads `personify failed: <reason>`, shown to
+     Desktop as a tool error, not as text to relay.
+   In every case, confirm Desktop calls the `personify` tool (visible in
+   its tool-call UI) and that a `not_verified` or `failed` result is never
+   sent, posted, or published anywhere by Desktop.
 4. Repeat step 2 in a second, separate fresh Desktop session to confirm no
    session-specific priming is required.
 5. Break it on purpose: temporarily rename the installed personify plugin

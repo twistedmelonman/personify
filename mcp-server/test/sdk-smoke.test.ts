@@ -72,23 +72,23 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     expect(result.tools[0].inputSchema.required).toEqual(["text"]);
   });
 
-  it("advertises the mode argument in the tool schema", async () => {
+  it("advertises text only, plus an output schema", async () => {
     const client = await connectedClient();
-
     const result = await client.listTools();
-
-    const schema = result.tools[0].inputSchema as {
-      properties: Record<string, { enum?: string[] }>;
-    };
-    expect(schema.properties).toHaveProperty("mode");
-    expect(schema.properties.mode.enum).toEqual(["default", "both"]);
-    expect(schema.required).toEqual(["text"]);
+    const tool = result.tools[0];
+    expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(["text"]);
+    expect(tool.outputSchema?.required).toEqual(["outcome"]);
   });
 
   it("calls the personify tool over a real handshake and gets a real result", async () => {
-    runPersonifyMock.mockResolvedValue({ ok: true, text: "clean text" });
+    runPersonifyMock.mockResolvedValue({
+      kind: "verified",
+      text: "clean text",
+      sha256: "c".repeat(64),
+    });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
     const client = await connectedClient();
+    await client.listTools();
 
     const result = await client.callTool({
       name: "personify",
@@ -98,15 +98,17 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     expect(result.isError).toBeFalsy();
     const content = result.content as Array<{ type: string; text: string }>;
     expect(content[0].text).toContain("clean text");
+    expect(result.structuredContent).toMatchObject({ outcome: "verified" });
   });
 
   it("surfaces a tool error over a real handshake, not a protocol-level failure", async () => {
     runPersonifyMock.mockResolvedValue({
-      ok: false,
+      kind: "failed",
       error: "personify CLI exited with exit code 1: skill not found",
     });
     checkPersonifyVersionMock.mockResolvedValue({ stale: false });
     const client = await connectedClient();
+    await client.listTools();
 
     const result = await client.callTool({
       name: "personify",
@@ -116,5 +118,23 @@ describe("MCP SDK smoke test (real Server + real Client, in-process transport)",
     expect(result.isError).toBe(true);
     const content = result.content as Array<{ type: string; text: string }>;
     expect(content[0].text).toContain("skill not found");
+  });
+
+  it("round-trips a not-verified result through the client's schema validation", async () => {
+    runPersonifyMock.mockResolvedValue({
+      kind: "not_verified",
+      draft: "D.",
+      sha256: "d".repeat(64),
+      report: "AI.",
+    });
+    checkPersonifyVersionMock.mockResolvedValue({ stale: false });
+    const client = await connectedClient();
+    await client.listTools();
+    const result = await client.callTool({
+      name: "personify",
+      arguments: { text: "raw" },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({ outcome: "not_verified" });
   });
 });

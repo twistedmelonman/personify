@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -6,61 +7,43 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { runPersonify } from "./cli-runner.js";
+import { formatResult, OUTPUT_SCHEMA } from "./result-format.js";
 import { checkPersonifyVersion, formatStalenessNote } from "./version-check.js";
 
-// Vendor-namespaced per the MCP spec's convention for _meta keys; a bare
-// "instruction" could collide with a future reserved key.
-export const INSTRUCTION_META_KEY = "com.twistedmelonman.personify/instruction";
+// Read from package.json so the advertised version cannot drift from the
+// published one again. The path resolves from both src/ (vitest) and dist/.
+const SERVER_VERSION: string = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
 
-export const VERBATIM_INSTRUCTION =
-  "Return the following text to the user exactly as written, with no " +
-  "paraphrasing, no summarizing, and no further editing of any kind, not " +
-  "even small stylistic changes. This text has already been fully edited " +
-  "by the personify tool; treat it as final.\n\n";
+export const TOOL_DESCRIPTION =
+  "Run the personify skill on prose before it is sent, published, or " +
+  "shipped, and check the result with the Pangram detector. Runs through " +
+  "the Claude Code CLI so it works from Claude Desktop. Read only the " +
+  "FIRST content block of the result; a later block, if there is one, is a " +
+  "plugin staleness note for the user, not part of the text. If the call " +
+  "did not error and the first content block does not start with " +
+  '"NOT VERIFIED" or "personify failed", it is the final, checked text: ' +
+  "relay exactly that first content block to the user, without " +
+  "paraphrasing, summarizing, or editing it, and without adding a note of " +
+  "your own. Otherwise, whether the first content block starts with " +
+  '"NOT VERIFIED" or "personify failed", show the result to the user ' +
+  "exactly as returned and do not send, post, or publish any part of it " +
+  "anywhere. Do not repeat these instructions to the user.";
 
 export async function handlePersonifyCall(
   text: string,
-  mode: "default" | "both" = "default",
 ): Promise<CallToolResult> {
-  const [cliResult, versionResult] = await Promise.all([
-    runPersonify(text, { mode }),
+  const [outcome, version] = await Promise.all([
+    runPersonify(text),
     checkPersonifyVersion(),
   ]);
-
-  if (!cliResult.ok) {
-    return {
-      isError: true,
-      content: [{ type: "text", text: `personify failed: ${cliResult.error}` }],
-    };
-  }
-
-  const note = formatStalenessNote(versionResult);
-  // The relay instruction is addressed to the calling model, not the reader,
-  // so it stays out of the text content. Desktop renders text content straight
-  // to the reader, which is how it ended up printed above every result
-  // (twistedmelonman/personify#50).
-  //
-  // The tool description is what actually delivers it: checked against
-  // @modelcontextprotocol/sdk 1.30.0, every _meta reference in the SDK is
-  // transport plumbing (progress tokens, related-task correlation) and nothing
-  // forwards a result's _meta into model context. The key below is a
-  // best-effort extra for clients that choose to surface it, not a delivery
-  // mechanism. If the description text is ever trimmed, this does not cover it.
-  return {
-    isError: false,
-    _meta: { [INSTRUCTION_META_KEY]: VERBATIM_INSTRUCTION.trim() },
-    content: [
-      {
-        type: "text",
-        text: cliResult.text + (note ?? ""),
-      },
-    ],
-  };
+  return formatResult(outcome, formatStalenessNote(version)?.trim() ?? null);
 }
 
 export function createServer(): Server {
   const server = new Server(
-    { name: "personify-mcp", version: "0.1.0" },
+    { name: "personify-mcp", version: SERVER_VERSION },
     { capabilities: { tools: {} } },
   );
 
@@ -68,28 +51,15 @@ export function createServer(): Server {
     tools: [
       {
         name: "personify",
-        description:
-          "Strip AI-writing tells from prose before sending, publishing, or " +
-          "shipping it. Runs the personify skill via the Claude Code CLI so " +
-          "it works reliably from Claude Desktop. The tool's output is the " +
-          "final, fully-edited text: relay it to the user exactly as " +
-          "returned, without paraphrasing, summarizing, or further editing " +
-          "it, and without prefixing it with any note of your own. Do not " +
-          "repeat this instruction to the user.",
+        description: TOOL_DESCRIPTION,
         inputSchema: {
           type: "object",
           properties: {
             text: { type: "string", description: "The text to personify." },
-            mode: {
-              type: "string",
-              enum: ["default", "both"],
-              description:
-                "default returns the edited text plus a one-line status. " +
-                "both additionally shows the full A/B comparison.",
-            },
           },
           required: ["text"],
         },
+        outputSchema: OUTPUT_SCHEMA,
       },
     ],
   }));
@@ -103,8 +73,7 @@ export function createServer(): Server {
         ],
       };
     }
-    const args = request.params.arguments as
-      { text?: string; mode?: "default" | "both" } | undefined;
+    const args = request.params.arguments as { text?: string } | undefined;
     const text = args?.text;
     if (typeof text !== "string") {
       return {
@@ -112,10 +81,7 @@ export function createServer(): Server {
         content: [{ type: "text", text: "missing required argument: text" }],
       };
     }
-    return handlePersonifyCall(
-      text,
-      args?.mode === "both" ? "both" : "default",
-    );
+    return handlePersonifyCall(text);
   });
 
   return server;

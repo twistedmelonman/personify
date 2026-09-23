@@ -1,61 +1,57 @@
 import { spawn } from "node:child_process";
-import type { CliResult } from "./types.js";
+import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildCliArgs } from "./cli-args.js";
+import { locateInstall } from "./install-locator.js";
+import { configRoot, resolveVoiceGuide } from "./paths.js";
+import { checkStamp } from "./stamp-verifier.js";
 import { loadOAuthToken } from "./token.js";
-import { stripCliPreamble } from "./strip-preamble.js";
-import { stripStatusLine } from "./strip-status-line.js";
+import type { Outcome } from "./types.js";
 
-export const PERSONIFY_INSTRUCTION =
-  "Run the personify:personify skill on the text provided via stdin. Your " +
-  "entire response must be the resulting text and nothing else. Do not " +
-  "explain what register the text is, do not state which rules you are " +
-  "applying, do not announce what you are about to do, and do not introduce " +
-  'the result with a line like "Here\'s the rewrite:". Start your response ' +
-  "with the first character of the edited text. No preamble, no commentary, " +
-  "no trailing notes, no markdown code fence around it.";
-
-// Two arms plus a blind review, not one rewrite. The old 30s budget was sized
-// for a single pass and times out on nearly every 1.0 invocation.
+// One draft plus one Pangram check. Measured at 30 to 40 s on 2026-09-22.
+// The check script can poll for about 220 s at worst, but the CLI's Bash tool
+// cuts it off at 120 s, and every limit here fails closed.
 export const DEFAULT_TIMEOUT_MS = 180_000;
 
-export const SHOW_BOTH_SUFFIX =
-  " After producing the result, show both arms: the full comparison with " +
-  "context, each arm's reported rules, the A to B diff, and the reviewer " +
-  "verdict.";
+export type RunOptions = {
+  timeoutMs?: number;
+  tokenPath?: string;
+  installedPluginsPath?: string;
+  env?: NodeJS.ProcessEnv;
+};
 
-export async function runPersonify(
+type ChildResult =
+  | { kind: "exited"; code: number | null; stdout: string; stderr: string }
+  | { kind: "timeout"; stdout: string }
+  | { kind: "spawn_error"; message: string };
+
+// --output-format json puts the model's final message in `result`. It is
+// only ever shown as a report; the outcome is decided by the file and stamp.
+export function parseReport(stdout: string): string {
+  try {
+    const parsed = JSON.parse(stdout);
+    if (typeof parsed?.result === "string") return parsed.result.trim();
+  } catch {
+    // Not JSON: show what the CLI printed.
+  }
+  return stdout.trim();
+}
+
+function runChild(
+  args: string[],
   text: string,
-  opts: {
-    timeoutMs?: number;
-    tokenPath?: string;
-    mode?: "default" | "both";
-  } = {},
-): Promise<CliResult> {
-  if (text.trim().length === 0) {
-    return { ok: false, error: "no text provided" };
-  }
-
-  const tokenResult = await loadOAuthToken({ tokenPath: opts.tokenPath });
-  if (!tokenResult.ok) {
-    return { ok: false, error: tokenResult.error };
-  }
-
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number,
+): Promise<ChildResult> {
   return new Promise((resolve) => {
-    const instruction =
-      opts.mode === "both"
-        ? PERSONIFY_INSTRUCTION + SHOW_BOTH_SUFFIX
-        : PERSONIFY_INSTRUCTION;
-    const child = spawn(
-      "claude",
-      ["--print", "--permission-mode", "auto", instruction],
-      {
-        shell: false,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: tokenResult.token },
-      },
-    );
-
+    // No cwd on purpose: Claude Code keys session transcripts by cwd, so a
+    // per-call temp dir would create a new ~/.claude/projects/ entry each time.
+    const child = spawn("claude", args, {
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+      env,
+    });
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -66,10 +62,7 @@ export async function runPersonify(
       child.kill("SIGTERM");
       const killTimer = setTimeout(() => child.kill("SIGKILL"), 5_000);
       killTimer.unref();
-      resolve({
-        ok: false,
-        error: `personify CLI call timed out after ${timeoutMs}ms`,
-      });
+      resolve({ kind: "timeout", stdout });
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk: Buffer) => {
@@ -78,38 +71,18 @@ export async function runPersonify(
     child.stderr?.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
     });
-
     child.on("error", (err) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({
-        ok: false,
-        error: `failed to spawn claude CLI: ${err.message}`,
-      });
+      resolve({ kind: "spawn_error", message: err.message });
     });
-
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (code === 0) {
-        // "both" mode asked for the full comparison, so its status line and
-        // arm reports are the requested payload rather than exhaust. Only the
-        // default mode returns text a caller pastes somewhere else.
-        const body = stripCliPreamble(stdout);
-        resolve({
-          ok: true,
-          text: opts.mode === "both" ? body : stripStatusLine(body),
-        });
-      } else {
-        resolve({
-          ok: false,
-          error: `personify CLI exited with exit code ${code}: ${stderr.trim() || stdout.trim()}`,
-        });
-      }
+      resolve({ kind: "exited", code, stdout, stderr });
     });
-
     child.stdin?.on("error", () => {
       // Swallow EPIPE: the child exited before draining stdin. The real
       // outcome is reported by the close/error handlers above.
@@ -117,4 +90,98 @@ export async function runPersonify(
     child.stdin?.write(text);
     child.stdin?.end();
   });
+}
+
+export async function runPersonify(
+  text: string,
+  opts: RunOptions = {},
+): Promise<Outcome> {
+  if (text.trim().length === 0) {
+    return { kind: "failed", error: "no text provided" };
+  }
+  const env = opts.env ?? process.env;
+
+  const install = await locateInstall(opts.installedPluginsPath);
+  if (!install) {
+    return {
+      kind: "failed",
+      error:
+        "the personify plugin is not installed, or its install has no " +
+        "scripts/pangram_check.py. Install it with " +
+        "/plugin install personify@personify.",
+    };
+  }
+
+  const token = await loadOAuthToken({ tokenPath: opts.tokenPath });
+  if (!token.ok) return { kind: "failed", error: token.error };
+
+  const root = configRoot(env);
+  // realpath matters on macOS, where the temp dir sits behind a /var symlink
+  // and a permission rule naming the unresolved path may not match.
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "personify-")));
+  const bodyPath = join(dir, "body.md");
+  try {
+    const args = buildCliArgs({
+      installPath: install.installPath,
+      voiceGuide: await resolveVoiceGuide(env),
+      bodyPath,
+    });
+    const child = await runChild(
+      args,
+      text,
+      { ...env, CLAUDE_CODE_OAUTH_TOKEN: token.token },
+      opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    );
+
+    if (child.kind === "spawn_error") {
+      return {
+        kind: "failed",
+        error: `failed to spawn claude CLI: ${child.message}`,
+      };
+    }
+    if (child.kind === "timeout") {
+      const report = parseReport(child.stdout);
+      return {
+        kind: "failed",
+        error: `personify CLI call timed out after ${opts.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`,
+        ...(report ? { report } : {}),
+      };
+    }
+    const report = parseReport(child.stdout);
+    if (child.code !== 0) {
+      return {
+        kind: "failed",
+        error: `personify CLI exited with exit code ${child.code}: ${child.stderr.trim() || report}`,
+      };
+    }
+
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(bodyPath);
+    } catch {
+      return {
+        kind: "failed",
+        error: "the CLI finished without writing a draft",
+        ...(report ? { report } : {}),
+      };
+    }
+
+    const stamp = await checkStamp(bytes, join(root, "stamps"));
+    if (stamp.verified) {
+      return {
+        kind: "verified",
+        text: bytes.toString("utf8"),
+        sha256: stamp.sha256,
+        ...(stamp.taskId ? { taskId: stamp.taskId } : {}),
+      };
+    }
+    return {
+      kind: "not_verified",
+      draft: bytes.toString("utf8"),
+      sha256: stamp.sha256,
+      report,
+    };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
