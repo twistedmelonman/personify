@@ -1,6 +1,6 @@
 ---
 name: personify
-version: 2.0.2
+version: 2.0.3
 description: Draft in your own register, then check the result against a detector before sending, publishing, or shipping it. Use when editing text (emails, docs, comments, PRs, blog drafts, essays) someone else will read. Reads an optional per-user voice guide (VOICE.md) and treats it as authoritative, so output sounds like a specific person rather than generically clean. Submits the result to Pangram and stops when the verdict is not Human, rather than editing toward a score. Also carries the structural rules for GitHub PR descriptions and code comments, which no detector can see. Derivative of blader/humanizer (MIT); see license field.
 license: MIT (derivative of blader/humanizer; see Provenance)
 ---
@@ -136,13 +136,17 @@ the floor is measured on what survives. A 30-word PR body wrapped around a
 reinserted, because the client never edits: the original bytes are what
 publishes.
 
-On a pass the client writes a stamp to `~/.config/personify/stamps/<sha256>.json`
-carrying the task id, the model, the verdict, and the word count. The stamp is
-what a hook will eventually check to confirm that the exact bytes being published
-were classified. That hook integration does not exist yet. Today the existing
-review gate still stops every commit message and PR body whatever the verdict
-says, so a pass is information for the person reviewing rather than a bypass. A
-failing verdict is the same gate plus a reason to act on.
+Every run that reaches a result, pass, fail, or skip, writes a check record to
+`~/.config/personify/checks/<sha256>.json`. The review gate's `stage` step
+refuses a file that has no record, so the check must run on the exact bytes
+being staged before anyone is asked to approve them, and the batch header shows
+each item's result while the reviewer reads. The gate enforces that the check
+ran, not what it said: a failing verdict still reaches the reviewer, as a
+reason to act. On a pass the client also writes a stamp to
+`~/.config/personify/stamps/<sha256>.json` carrying the task id, the model, the
+verdict, and the word count, and the Desktop bridge decides from that stamp. A
+run that fails before a verdict writes neither, so the file cannot be staged
+until a check succeeds.
 
 Report the word count and the estimated cost from the JSON on stdout. At the
 production model this is a fraction of a cent, and printing it makes an
