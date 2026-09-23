@@ -55,21 +55,77 @@ needs_install() {
   [[ "${server_dir}/package-lock.json" -nt "${marker}" ]]
 }
 
+# Desktop starts this script several times at once: a probe it kills within
+# milliseconds, the chat server, and a shared pool. Two `npm ci` runs in one
+# directory delete each other's node_modules, so only the holder of this lock
+# installs or builds. mkdir is the lock because it is atomic and macOS ships
+# no flock(1).
+lock_dir="${server_dir}/.build-lock"
+lock_timeout=180
+npm_pid=""
+
+release_lock() {
+  # A foreground npm would outlive a terminated script and keep rewriting
+  # node_modules after the next instance took the lock. It runs in the
+  # background instead, so it can be stopped here.
+  if [[ -n "${npm_pid}" ]]; then
+    kill -TERM "${npm_pid}" 2>/dev/null || true
+    wait "${npm_pid}" 2>/dev/null || true
+    npm_pid=""
+  fi
+  rm -rf "${lock_dir}"
+}
+
+acquire_lock() {
+  local waited=0 holder
+  while ! mkdir "${lock_dir}" 2>/dev/null; do
+    holder="$(cat "${lock_dir}/pid" 2>/dev/null || true)"
+    if [[ -n "${holder}" ]] && ! kill -0 "${holder}" 2>/dev/null; then
+      log "removing a stale build lock left by process ${holder}"
+      rm -rf "${lock_dir}"
+      continue
+    fi
+    if [[ "${waited}" -ge "${lock_timeout}" ]]; then
+      die "waited ${lock_timeout}s for the build lock. If no other personify-mcp is running, remove it: rm -rf '${lock_dir}'"
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  echo "$$" >"${lock_dir}/pid"
+  trap release_lock EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+}
+
+run_npm() {
+  local rc=0
+  npm --prefix "${server_dir}" "$@" 1>&2 &
+  npm_pid=$!
+  wait "${npm_pid}" || rc=$?
+  npm_pid=""
+  return "${rc}"
+}
+
 if needs_build; then
   command -v npm >/dev/null 2>&1 \
     || die "dist/ is missing or stale and npm is not on PATH (${PATH})."
+  acquire_lock
+  # Another instance may have finished the work while this one waited.
   if needs_install; then
     # npm ci also builds, through the package's prepare script.
     log "installing dependencies in ${server_dir}"
-    npm --prefix "${server_dir}" ci 1>&2 \
+    run_npm ci \
       || die "npm ci failed in ${server_dir}. Run it there by hand to see why."
   fi
   if needs_build; then
     log "rebuilding ${entry}"
-    npm --prefix "${server_dir}" run build 1>&2 \
+    run_npm run build \
       || die "npm run build failed in ${server_dir}. Run it there by hand to see why."
   fi
   [[ -f "${entry}" ]] || die "the build finished but ${entry} does not exist."
+  # exec skips the EXIT trap, so the lock is released first.
+  release_lock
+  trap - EXIT TERM INT
 fi
 
 exec node "${entry}"
