@@ -205,8 +205,15 @@ Not verified is not an error. A draft awaiting review is a normal result,
 and `isError: true` tends to make the calling model retry, which would be a
 second submission.
 
-`structuredContent` carries `{ outcome, sha256?, task_id?, staleness? }`,
-declared through the tool's `outputSchema`. When the result is verified, the
+`structuredContent` carries the same result in fields, declared through the
+tool's `outputSchema`: `outcome`, then `text` when verified, `report` and
+`draft` when not verified, and `error` plus an optional `report` when failed,
+along with `sha256`, `task_id`, and `staleness` where they apply. The text is
+in both places because clients differ in which one reaches the model. In a
+live Desktop call on 2026-09-23, with a structured result that held only the
+outcome, Desktop's model received those fields and no content text at all, so
+it had nothing to show. The structured `text` is the same bytes as the first
+content block. When the result is verified, the
 first content block is exactly the stamped bytes: nothing is prepended or
 appended to it, or the bytes delivered would no longer be the bytes that
 were stamped. This is not necessarily every byte Pangram scored, since
@@ -214,8 +221,9 @@ were stamped. This is not necessarily every byte Pangram scored, since
 Pangram. A version-staleness note, when there is one, rides in a separate
 second content block and in `structuredContent.staleness`.
 
-The tool description is conditional on the outcome, and only the FIRST
-content block matters for this decision: a second block, when there is one,
+The tool description is conditional on the outcome and covers both forms.
+For the structured form it keys on `outcome`. For the content form only the
+FIRST content block matters: a second block, when there is one,
 is a plugin staleness note for the user, not part of the text. When the call
 did not error and that first block does not start with `NOT VERIFIED` or
 `personify failed`, it is final and should be relayed exactly as returned.
