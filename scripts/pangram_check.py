@@ -85,7 +85,7 @@ POLL_ATTEMPTS = 30
 POLL_INITIAL_DELAY = 1.0
 POLL_MAX_DELAY = 8.0
 OP_TIMEOUT_SECONDS = 15
-OP_SECRET_REFERENCE = "op://Automation/Pangram/API Key"
+OP_ITEM_REFERENCE = "op://Automation/Pangram/API Key"
 KEYCHAIN_SERVICE = "personify-pangram-key"
 KEYCHAIN_TIMEOUT_SECONDS = 5
 SCRIPT_PATH = Path(__file__).resolve()
@@ -200,7 +200,7 @@ def read_key_file(path: Path) -> str | None:
     return key
 
 
-def read_op_secret(reference: str = OP_SECRET_REFERENCE) -> str | None:
+def read_op_secret(reference: str = OP_ITEM_REFERENCE) -> str | None:
     """Fetch the key from 1Password, or return None if that is not possible.
 
     `op read` needs a TTY, which hooks and the MCP server do not have, so this
@@ -309,7 +309,7 @@ def missing_key_message(env: dict[str, str]) -> str:
         f"    {manual_keychain_command()}\n\n"
         "Other sources, checked in this order: PANGRAM_API_KEY, the Keychain "
         f"item {KEYCHAIN_SERVICE}, {config_root(env) / 'pangram-key'} at mode "
-        f'600, and "op read {OP_SECRET_REFERENCE}".'
+        f'600, and "op read {OP_ITEM_REFERENCE}".'
     )
 
 
@@ -369,7 +369,7 @@ def install_key(
     key = op_read()
     if not key:
         return EXIT_UNAVAILABLE, (
-            f'could not read the key with "op read {OP_SECRET_REFERENCE}". '
+            f'could not read the key with "op read {OP_ITEM_REFERENCE}". '
             "Run this from a terminal signed in to 1Password. " + manual
         )
     if not keychain_write(key):
