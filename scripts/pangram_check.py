@@ -15,6 +15,12 @@ INVOCATION CONTRACT, and it is load-bearing. Redirect the file into stdin:
 
     python3 pangram_check.py < body.md
 
+Two flags run without reading stdin and without touching the network:
+
+    python3 pangram_check.py --check-key     exit 0 if a key resolves, else 5
+    python3 pangram_check.py --install-key   copy the key from 1Password into
+                                             the macOS login Keychain
+
 The stamp is keyed by the sha256 of the bytes stdin delivers, and the hook
 hashes the file that `git commit -F` or `gh pr create --body-file` reads. Those
 two hashes match only when stdin IS that file. `echo "$text" | pangram_check.py`
@@ -37,7 +43,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import pwd
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -76,7 +85,10 @@ POLL_ATTEMPTS = 30
 POLL_INITIAL_DELAY = 1.0
 POLL_MAX_DELAY = 8.0
 OP_TIMEOUT_SECONDS = 15
-OP_SECRET_REFERENCE = "op://Automation/Pangram/API Key"
+OP_ITEM_REFERENCE = "op://Automation/Pangram/API Key"
+KEYCHAIN_SERVICE = "personify-pangram-key"
+KEYCHAIN_TIMEOUT_SECONDS = 5
+SCRIPT_PATH = Path(__file__).resolve()
 
 
 class TransportError(Exception):
@@ -188,7 +200,7 @@ def read_key_file(path: Path) -> str | None:
     return key
 
 
-def read_op_secret(reference: str = OP_SECRET_REFERENCE) -> str | None:
+def read_op_secret(reference: str = OP_ITEM_REFERENCE) -> str | None:
     """Fetch the key from 1Password, or return None if that is not possible.
 
     `op read` needs a TTY, which hooks and the MCP server do not have, so this
@@ -209,21 +221,117 @@ def read_op_secret(reference: str = OP_SECRET_REFERENCE) -> str | None:
     return key or None
 
 
+def keychain_account() -> str:
+    """The login name, read from the password database like `id -un`.
+
+    Claude Desktop launches with a near-empty environment, so $USER may be
+    unset where this runs.
+    """
+    return pwd.getpwuid(os.getuid()).pw_name
+
+
+def read_keychain_secret() -> str | None:
+    """Fetch the key from the macOS login Keychain, or return None.
+
+    Skipped where `security` is not on PATH, which is every non-macOS host.
+    """
+    if shutil.which("security") is None:
+        return None
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "find-generic-password",
+                "-a",
+                keychain_account(),
+                "-s",
+                KEYCHAIN_SERVICE,
+                "-w",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=KEYCHAIN_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    key = result.stdout.strip()
+    return key or None
+
+
+def write_keychain_secret(key: str) -> bool:
+    """Store the key in the login Keychain, replacing any existing item."""
+    if shutil.which("security") is None:
+        return False
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "add-generic-password",
+                "-U",
+                "-a",
+                keychain_account(),
+                "-s",
+                KEYCHAIN_SERVICE,
+                "-w",
+                key,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=KEYCHAIN_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def install_key_command() -> str:
+    return f"python3 {shlex.quote(str(SCRIPT_PATH))} --install-key"
+
+
+def manual_keychain_command() -> str:
+    # `-w` last with no value makes `security` prompt, which keeps the key out
+    # of shell history.
+    return (
+        f'security add-generic-password -U -a "$(id -un)" '
+        f"-s {KEYCHAIN_SERVICE} -w"
+    )
+
+
+def missing_key_message(env: dict[str, str]) -> str:
+    return (
+        "no Pangram API key found, so nothing can be verified. Install the key "
+        "once from a terminal with:\n\n"
+        f"    {install_key_command()}\n\n"
+        "That copies it from 1Password into the macOS login Keychain. Without "
+        "1Password, add it by hand; security prompts for the key:\n\n"
+        f"    {manual_keychain_command()}\n\n"
+        "Other sources, checked in this order: PANGRAM_API_KEY, the Keychain "
+        f"item {KEYCHAIN_SERVICE}, {config_root(env) / 'pangram-key'} at mode "
+        f'600, and "op read {OP_ITEM_REFERENCE}".'
+    )
+
+
 def resolve_key(
     env: dict[str, str],
     op_read: Callable[[], str | None] = read_op_secret,
+    keychain_read: Callable[[], str | None] = read_keychain_secret,
 ) -> str:
-    """Resolve the API key from the env var, then the key file, then 1Password.
+    """Resolve the API key: env var, Keychain, key file, then 1Password.
 
-    The key file exists as a source because Claude Desktop launches MCP servers
-    under launchd with a near-empty environment and `op read` fails without a
-    TTY, so neither of the other two sources is reachable there. When both the
-    env var and the file are set the env var wins, which keeps a one-off
-    override working.
+    Claude Desktop launches MCP servers under launchd with a near-empty
+    environment and `op read` fails without a TTY, so the Keychain copy and
+    the key file are the sources reachable there. When the env var is set it
+    wins, which keeps a one-off override working.
     """
     from_env = env.get("PANGRAM_API_KEY", "").strip()
     if from_env:
         return from_env
+
+    from_keychain = keychain_read()
+    if from_keychain:
+        return from_keychain
 
     from_file = read_key_file(config_root(env) / "pangram-key")
     if from_file:
@@ -233,10 +341,43 @@ def resolve_key(
     if from_op:
         return from_op
 
-    raise CheckError(
-        "no Pangram API key found. Set PANGRAM_API_KEY, or write the key to "
-        f"{config_root(env) / 'pangram-key'} with mode 600, or make "
-        f"\"op read {OP_SECRET_REFERENCE}\" work."
+    raise CheckError(missing_key_message(env))
+
+
+def check_key(
+    env: dict[str, str],
+    op_read: Callable[[], str | None] = read_op_secret,
+    keychain_read: Callable[[], str | None] = read_keychain_secret,
+) -> tuple[int, dict]:
+    """Report whether a key resolves, without printing it or calling Pangram."""
+    try:
+        resolve_key(env, op_read=op_read, keychain_read=keychain_read)
+    except CheckError as err:
+        return err.code, {"status": "UNAVAILABLE", "error": err.message}
+    return EXIT_PASS, {"status": "KEY_OK"}
+
+
+def install_key(
+    op_read: Callable[[], str | None] = read_op_secret,
+    keychain_write: Callable[[str], bool] = write_keychain_secret,
+) -> tuple[int, str]:
+    """Copy the key from 1Password into the Keychain. Never echoes the key."""
+    manual = (
+        "Add it by hand instead; security prompts for the key:\n\n"
+        f"    {manual_keychain_command()}"
+    )
+    key = op_read()
+    if not key:
+        return EXIT_UNAVAILABLE, (
+            f'could not read the key with "op read {OP_ITEM_REFERENCE}". '
+            "Run this from a terminal signed in to 1Password. " + manual
+        )
+    if not keychain_write(key):
+        return EXIT_UNAVAILABLE, (
+            f"could not write the Keychain item {KEYCHAIN_SERVICE}. " + manual
+        )
+    return EXIT_PASS, (
+        f"stored the Pangram API key in the login Keychain as {KEYCHAIN_SERVICE}."
     )
 
 
@@ -616,12 +757,25 @@ def check(
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    env = dict(os.environ)
+    if argv == ["--check-key"]:
+        try:
+            code, report = check_key(env)
+        except Exception as err:  # noqa: BLE001 - fail closed, as below
+            code, report = EXIT_UNAVAILABLE, {"status": "UNAVAILABLE", "error": str(err)}
+        print(json.dumps(report, indent=2))
+        if code != EXIT_PASS:
+            print(f"pangram_check: {report['error']}", file=sys.stderr)
+        return code
+    if argv == ["--install-key"]:
+        code, message = install_key()
+        print(f"pangram_check: {message}", file=sys.stderr)
+        return code
     if argv:
         print(__doc__, file=sys.stderr)
         return EXIT_UNAVAILABLE
 
     raw = sys.stdin.buffer.read()
-    env = dict(os.environ)
     try:
         # The key is resolved lazily, on the first request, so that a text
         # under the word floor skips without needing a credential at all.

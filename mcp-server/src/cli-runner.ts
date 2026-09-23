@@ -4,14 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildCliArgs } from "./cli-args.js";
 import { locateInstall } from "./install-locator.js";
+import { checkPangramKey } from "./key-preflight.js";
 import { configRoot, resolveVoiceGuide } from "./paths.js";
 import { checkStamp } from "./stamp-verifier.js";
 import { loadOAuthToken } from "./token.js";
 import type { Outcome } from "./types.js";
 
 // One draft plus one Pangram check. Measured at 30 to 40 s on 2026-09-22.
-// The check script can poll for about 220 s at worst, but the CLI's Bash tool
-// cuts it off at 120 s, and every limit here fails closed.
+// The check script can poll for about 220 s at worst. The CLI's Bash tool
+// limit follows BASH_DEFAULT_TIMEOUT_MS from the user's settings (300 s on
+// the maintainer's machine); when that is 180 s or more, this budget fires
+// first. Every limit here fails closed.
 export const DEFAULT_TIMEOUT_MS = 180_000;
 
 export type RunOptions = {
@@ -111,6 +114,9 @@ export async function runPersonify(
         "/plugin install personify@personify.",
     };
   }
+
+  const key = await checkPangramKey(install.scriptPath, env);
+  if (key.kind === "missing") return { kind: "failed", error: key.error };
 
   const token = await loadOAuthToken({ tokenPath: opts.tokenPath });
   if (!token.ok) return { kind: "failed", error: token.error };

@@ -38,9 +38,48 @@ From the repo root:
 
 ```bash
 cd mcp-server
-npm install
-npm run build
+npm ci
 ```
+
+`npm ci` builds `dist/` through the `prepare` script, and every build clears
+`dist/` first, so a source file that was deleted does not leave a stale
+module behind.
+
+Desktop does not run `dist/index.js` directly. It runs the launcher,
+`bin/personify-mcp`, which rebuilds `dist/` when it is missing or older than
+anything in `src/` (running `npm ci` first when `node_modules` is missing or
+out of date) and then execs the server. A `git pull` therefore takes effect
+on the next Desktop restart, with no manual rebuild. The launcher writes its
+build output to stderr, since stdout is the MCP protocol channel; when a
+build fails it prints the reason to stderr and exits non-zero, and Desktop
+shows the server as failed.
+
+## Pangram API key
+
+Every call is checked by Pangram, so the machine needs the Pangram API key.
+Desktop starts the server with a near-empty environment and no terminal, so
+neither `PANGRAM_API_KEY` from your shell nor `op read` works there. The key
+lives in the macOS login Keychain instead. Install it once, from a terminal
+signed in to 1Password:
+
+```bash
+python3 <installPath>/scripts/pangram_check.py --install-key
+```
+
+`<installPath>` is the personify plugin's install path, listed under
+`personify@personify` in `~/.claude/plugins/installed_plugins.json`. Without
+1Password, add it by hand; `security` prompts for the key:
+
+```bash
+security add-generic-password -U -a "$(id -un)" -s personify-pangram-key -w
+```
+
+Before each call the bridge runs `pangram_check.py --check-key`, which makes
+no network call. When no key resolves, the call fails at once with the
+script's message, which names both commands above, instead of coming back
+`NOT VERIFIED` after a full draft. An installed skill older than 2.0.2 does
+not know the flag; the bridge then skips the preflight and behaves as 0.3.0
+did.
 
 ## Authenticate
 
@@ -106,14 +145,17 @@ npm run install-desktop-config
 
 This merges a `personify` entry into
 `~/Library/Application Support/Claude/claude_desktop_config.json` (creating
-the file if it does not exist yet), using the absolute path to this repo's
-`dist/index.js`. It only ever touches the `personify` key under
-`mcpServers`; any other MCP servers or settings already in that file are
-left exactly as they are. Running it again (for example after moving the
-repo, or to pick up a rebuilt `dist/`) safely updates the entry in place
-rather than duplicating it.
+the file if it does not exist yet), whose command is the absolute path to
+this repo's `bin/personify-mcp` launcher, with no arguments. It only ever
+touches the `personify` key under `mcpServers`; any other MCP servers or
+settings already in that file are left exactly as they are. Running it again
+(for example after moving the repo) safely updates the entry in place rather
+than duplicating it, and it replaces an older `node .../dist/index.js` entry
+with the launcher.
 
-Restart Desktop after running it.
+Fully quit and restart Desktop after the first install. Desktop reads this
+file only at launch. After that, a `git pull` needs only a Desktop restart;
+the launcher rebuilds whatever changed.
 
 macOS only for now. On other platforms, add the following to
 `claude_desktop_config.json` by hand instead (path varies by OS; see
@@ -124,8 +166,8 @@ looks for it there):
 {
   "mcpServers": {
     "personify": {
-      "command": "node",
-      "args": ["/absolute/path/to/personify/mcp-server/dist/index.js"]
+      "command": "/absolute/path/to/personify/mcp-server/bin/personify-mcp",
+      "args": []
     }
   }
 }
@@ -182,14 +224,17 @@ Otherwise, whether the first block starts with `NOT VERIFIED` or
 nothing in it sent, posted, or published anywhere.
 
 Each call has a 180 s budget. If it expires before the CLI finishes, the
-outcome is `failed`. The CLI's own Bash tool has a separate, shorter 120 s
-default limit, which can cut the check script off before the bridge's own
-budget does; when that happens no stamp gets written, so the result comes
-back `not_verified` rather than `verified`. This is not an absolute rule,
-though: stamps are content-addressed by the sha256 of the draft bytes, so if
+outcome is `failed`. The CLI's own Bash tool has a separate limit, which
+follows `BASH_DEFAULT_TIMEOUT_MS` from your Claude Code settings; user-level
+settings load in the spawned CLI. On the maintainer's machine that is
+300000 (300 s), longer than the bridge's budget, so the bridge's 180 s fires
+first and the outcome is `failed`. If your setting is shorter than 180 s,
+the Bash limit can cut the check script off first; no stamp gets written
+then, so the result comes back `not_verified` rather than `verified`. Even
+then, stamps are content-addressed by the sha256 of the draft bytes, so if
 an earlier call already produced a valid stamp for those exact bytes, a
-later cut-off run can still come back `verified`. That is by design, not a
-race: identical bytes were already checked and passed.
+cut-off run can still come back `verified`. That is by design, not a race:
+identical bytes were already checked and passed.
 
 ## Permissions
 

@@ -1,4 +1,5 @@
-import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir, access } from "node:fs/promises";
+import { constants } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 // tsconfig.json has outDir=dist, rootDir=src, so src/desktop-config.ts
@@ -9,7 +10,7 @@ import {
 } from "../dist/desktop-config.js";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const serverEntryPath = join(scriptDir, "..", "dist", "index.js");
+const launcherPath = join(scriptDir, "..", "bin", "personify-mcp");
 
 async function main() {
   if (process.platform !== "darwin") {
@@ -23,16 +24,13 @@ async function main() {
   }
 
   try {
-    await stat(serverEntryPath);
+    await access(launcherPath, constants.X_OK);
   } catch (err) {
-    if (err.code === "ENOENT") {
-      console.error(
-        `${serverEntryPath} does not exist. Run "npm run build" first, ` +
-          "or use \"npm run install-desktop-config\" which does this for you.",
-      );
-    } else {
-      console.error(`Could not access ${serverEntryPath}: ${err.message}`);
-    }
+    console.error(
+      `${launcherPath} is missing or not executable (${err.code}). ` +
+        `Restore it with "git checkout -- bin/personify-mcp" and ` +
+        `"chmod +x bin/personify-mcp".`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -59,7 +57,7 @@ async function main() {
 
   let merged;
   try {
-    merged = mergeConfig(existing, serverEntryPath);
+    merged = mergeConfig(existing, launcherPath);
   } catch (err) {
     console.error(err.message);
     process.exitCode = 1;
@@ -74,7 +72,7 @@ async function main() {
   );
 
   console.log(
-    `Configured personify in ${DEFAULT_DESKTOP_CONFIG_PATH} (command: node ${serverEntryPath}). ` +
+    `Configured personify in ${DEFAULT_DESKTOP_CONFIG_PATH} (command: ${launcherPath}). ` +
       "Restart Claude Desktop for the change to take effect.",
   );
 }
