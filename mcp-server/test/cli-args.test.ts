@@ -22,19 +22,23 @@ describe("buildCliArgs", () => {
     ]);
   });
 
-  it("allows exactly the five measured rules", () => {
+  // Measured 2026-09-23: with only the Edit rule, the CLI wrote body.md but
+  // denied the check's `< body.md` redirect, which is checked as a Read of a
+  // file outside the working directory. No check ran, so no stamp.
+  it("allows exactly the six measured rules", () => {
     expect(buildCliArgs(base).slice(5)).toEqual([
       "Bash(python3 /plug/2.0.0/scripts/pangram_check.py:*)",
       "Read(//home/u/.config/personify/**)",
       "Read(//plug/2.0.0/**)",
       "Read(//repo/VOICE.md)",
+      "Read(//private/tmp/p-1/body.md)",
       "Edit(//private/tmp/p-1/body.md)",
     ]);
   });
 
   it("omits the voice guide rule when no guide resolved", () => {
     const rules = buildCliArgs({ ...base, voiceGuidePath: null }).slice(5);
-    expect(rules).toHaveLength(4);
+    expect(rules).toHaveLength(5);
     expect(rules.some((r) => r.includes("VOICE"))).toBe(false);
   });
 

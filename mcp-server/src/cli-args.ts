@@ -37,6 +37,9 @@ export function buildCliArgs(input: CliArgsInput): string[] {
     `Read(/${input.configRoot}/**)`,
     `Read(/${input.installPath}/**)`,
     ...(input.voiceGuidePath ? [`Read(/${input.voiceGuidePath})`] : []),
+    // The check reads the file through a `< body.md` redirect, which the CLI
+    // checks as a Read; Edit alone let the model write it but not check it.
+    `Read(/${input.bodyPath})`,
     `Edit(/${input.bodyPath})`,
   ];
   // The prompt must come before --allowedTools, which is variadic.
