@@ -1,14 +1,14 @@
 # Personify
 
-An agent skill that keeps text from reading as machine-written before it goes out the door: emails, PR descriptions and review comments, docs, blog drafts, essays. You draft in your own register, the skill edits toward it, and then the result gets checked against a detector rather than declared clean.
+An agent skill that keeps text from reading as machine-written before anyone else reads it: emails, PR descriptions and review comments, docs, blog drafts, essays. The draft follows your own register, and then a detector checks the result rather than the skill declaring it clean.
 
 Personify 2.0 is a break from 1.x. The hand-maintained taxonomy of AI-writing tells is gone, along with the A/B harness and the evidence corpus that fed it. Three things replace them: a per-user voice guide, current model judgment about what reads as machine-written, and [Pangram](https://www.pangram.com/), which returns a verdict on the finished text.
 
-It started as a structural cousin of [blader/humanizer](https://github.com/blader/humanizer) (same idea, same MIT license, credited in [LICENSE](LICENSE)). The wording, the rules, and the version history here are independent and were never synced against that project.
+It started as a structural cousin of [blader/humanizer](https://github.com/blader/humanizer), with the same idea and the same MIT license, and [LICENSE](LICENSE) credits it. The wording, the rules, and the version history here are independent and were never synced against that project.
 
 ## How it works
 
-1. **Draft**, guided by your `VOICE.md` and seven hard rules (no dashes, never invent a fact, preserve every fact, name the actor, and so on).
+1. **Draft**, guided by your `VOICE.md` and seven hard rules, among them no dashes, never invent a fact, preserve every fact, and name the actor.
 2. **Check.** The result goes to `scripts/pangram_check.py`, which submits it to Pangram once and reports a verdict.
 3. **A `Human` verdict passes.** Anything else stops and reports the score and the flagged spans.
 
@@ -18,7 +18,7 @@ Text under 40 words is skipped rather than classified. Below that the detector p
 
 ## What a detector cannot see
 
-Two rules survive independently of Pangram, because Pangram scores how prose *reads* and cannot see how an artifact is *shaped*. It will happily pass a pull request description carrying ceremonial headers, bolded labels, and a "ready to merge upon approval" sign-off, as long as the sentences read human.
+Two rules survive independently of Pangram, because Pangram scores how prose *reads* and cannot see how an artifact is *shaped*. It will pass a pull request description carrying ceremonial headers, bolded labels, and a "ready to merge upon approval" sign-off, as long as the sentences read human.
 
 - **GitHub PR descriptions.** No headers, no bullets, no bold, no dashes. Four parts as plain prose: the problem, the evidence, the solution, references.
 - **Code comments.** Never more than 1:1 comment lines to code lines, and far lower in practice. A comment is for what the code cannot say.

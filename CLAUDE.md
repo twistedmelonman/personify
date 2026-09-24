@@ -13,7 +13,7 @@ This repository *is* a single Claude Code Skill, packaged as an installable plug
 - `README.md` and `LICENSE` are independently written; `LICENSE`'s provenance note credits blader/humanizer for the original taxonomy this skill grew out of, without making this repo track that project's releases.
 - `mcp-server/` is a separate Node/TypeScript package (its own `package.json`, tests via `vitest`) that bridges Claude Desktop to this skill by shelling out to the Claude Code CLI. It is versioned independently of `SKILL.md`/`plugin.json`: the lockstep version-bump rule below applies only to the skill content, not to this bridge. See `mcp-server/README.md`.
 
-The `.claude/` directory (note: no hyphen, different from `.claude-plugin/`) is boilerplate from a git template (project-specific config/hook scaffolding for Andrew's global Claude Code infrastructure at `~/.claude/`). Nothing in it is customized for this repo — `config.sh.template` is unmodified and `hooks/extensions/` only has the disabled example.
+The `.claude/` directory, with no hyphen and distinct from `.claude-plugin/`, is boilerplate from a git template: project-specific config and hook scaffolding for Andrew's global Claude Code infrastructure at `~/.claude/`. Nothing in it is customized for this repo. `config.sh.template` is unmodified and `hooks/extensions/` only has the disabled example.
 
 ## Working on this repo
 
