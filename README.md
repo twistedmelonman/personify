@@ -57,6 +57,8 @@ In practice Desktop has been unreliable about trusting its own filesystem connec
 
 ## Pangram API key
 
+The check needs a Pangram account. If you sign up through [my referral link](https://pangram.cello.so/hxm2HIQtCr7), you get 20% off the first three months of your subscription, and I get $10 if you sign up for a paid plan.
+
 The check needs a key, and each machine needs it installed once. 1Password holds the canonical copy; the macOS login Keychain holds the per-machine copy. After installing the plugin, run this once from a terminal signed in to 1Password:
 
 ```bash
