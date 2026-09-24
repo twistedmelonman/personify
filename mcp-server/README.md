@@ -6,30 +6,28 @@ server shells out to `claude --print` to do the actual work, so Desktop
 never has to load `VOICE.md` or evaluate Step 0's "treat this file as
 authoritative" instruction itself.
 
-See the parent repo's `SKILL.md` for what personify does, and the
-referenced issue (twistedmelonman/personify#23) for why this bridge exists:
+See the parent repo's `SKILL.md` for what personify does. The bridge exists
+because of [Build MCP service for Claude Desktop compatibility](https://github.com/twistedmelonman/personify/issues/23):
 Desktop has, in practice, denied its own filesystem connector was present
 and flagged Step 0 as injection-shaped, even when the connector was
 confirmed active. Claude Code CLI does not have this problem.
 
 ## Prerequisites
 
-- **Node.js >= 20.19** (check with `node --version`). Install via
-  [nodejs.org](https://nodejs.org) or `brew install node`.
-- **npm** (bundled with Node; check with `npm --version`).
-- **TypeScript compiler (`tsc`)**. `npm install` pulls in TypeScript as a
-  dev dependency, and `npm run build` resolves `tsc` from
-  `node_modules/.bin` automatically, so a project-local install is normally
-  enough. You only need `tsc` available globally (check with
-  `tsc --version`) if you invoke it directly outside of `npm run build`,
-  e.g. `brew install typescript` on macOS or `npm install -g typescript`.
-- The **`claude` CLI** on `PATH` (check with `claude --version`), with the
-  `personify` plugin installed (see "Known costs" below). This is needed
-  both to build the plugin dependency and to generate the OAuth token in
-  "Authenticate."
+- **Node.js 20.19 or later in the 20 line, or 22.12 or later.** Check with
+  `node --version`. Install from [nodejs.org](https://nodejs.org) or with
+  `brew install node`.
+- **npm**, which ships with Node. Check with `npm --version`.
+- **TypeScript.** `npm ci` installs it as a dev dependency and
+  `npm run build` finds `tsc` in `node_modules/.bin`. A global `tsc` is only
+  needed to run it outside `npm run build`.
+- The **`claude` CLI** on `PATH`, checked with `claude --version`, with the
+  `personify` plugin installed as shown under "Known costs" below. The
+  bridge runs the skill through it, and "Authenticate" uses it to generate
+  the OAuth token.
 
-If `npm install` or `npm run build` fail, run the three `--version` checks
-above first; a missing or too-old Node/npm/tsc produces confusing
+If `npm ci` or `npm run build` fails, run the `--version` checks above
+first. A missing or too-old Node, npm, or `tsc` produces confusing
 module-resolution or syntax errors rather than a clear "not found" message.
 
 ## Build
@@ -78,8 +76,8 @@ Before each call the bridge runs `pangram_check.py --check-key`, which makes
 no network call. When no key resolves, the call fails at once with the
 script's message, which names both commands above, instead of coming back
 `NOT VERIFIED` after a full draft. An installed skill older than 2.0.2 does
-not know the flag; the bridge then skips the preflight and behaves as 0.3.0
-did.
+not know the flag; the bridge then skips the preflight and behaves as bridge
+0.3.0 did.
 
 ## Authenticate
 
@@ -99,15 +97,15 @@ generated with:
 claude setup-token
 ```
 
-This opens a browser authorization flow (the same one `/login` uses) and,
-once you approve it, prints a token to your terminal. This token
-authenticates against your Claude subscription (Pro, Max, Team, or
-Enterprise) exactly like your normal `claude` session does: it is not an
-API key, and using it does not switch you to metered API billing.
+This opens the same browser authorization flow `/login` uses and, once you
+approve it, prints a token to your terminal. The token authenticates against
+your Claude subscription, whether Pro, Max, Team, or Enterprise, exactly like
+your normal `claude` session does: it is not an API key, and using it does
+not switch you to metered API billing.
 
-Copy the printed token into `~/.config/personify/token` (see
-`token.example` in this directory for the expected format), then lock
-down its permissions so only you can read it:
+Copy the printed token into `~/.config/personify/token`, in the format
+`token.example` in this directory shows, then lock down its permissions so
+only you can read it:
 
 ```bash
 mkdir -p ~/.config/personify
@@ -116,12 +114,12 @@ chmod 600 ~/.config/personify/token
 ```
 
 The server refuses to start a `claude` call if this file is missing, empty,
-or has permissions looser than 600 (owner read/write) or 400 (owner
-read-only).
+or has permissions looser than 600, owner read and write, or 400, owner
+read-only.
 
 If `XDG_CONFIG_HOME` is set in the environment Claude Desktop itself
 launches with, not just your shell, the token is read from
-`$XDG_CONFIG_HOME/personify/token` instead. Note that GUI-launched apps on
+`$XDG_CONFIG_HOME/personify/token` instead. GUI-launched apps on
 macOS do not inherit your shell's exports; if you rely on a custom
 `XDG_CONFIG_HOME`, set it explicitly via the `env` block in
 `claude_desktop_config.json` rather than assuming Desktop sees your
@@ -129,11 +127,14 @@ shell's value.
 
 To see or revoke a token you generated this way, visit
 [claude.ai/settings](https://claude.ai/settings) and look under the
-Claude Code section. Revocation there has been reported as unreliable in
-some cases for already-minted `setup-token` credentials; if a token stops
-working (or you want to be certain it is gone), delete
-`~/.config/personify/token` and run `claude setup-token` again for a
-fresh one.
+Claude Code section. Revocation there may not invalidate a token that
+already exists:
+[issue 43801 on the Claude Code tracker](https://github.com/anthropics/claude-code/issues/43801)
+reports OAuth tokens still working days after revoking every Claude Code
+instance on claude.ai. That report is about the VS Code extension's login,
+not `setup-token` specifically. If a token stops working, or you want to be
+certain it is gone, delete `~/.config/personify/token` and run
+`claude setup-token` again for a fresh one.
 
 ## Configure in Claude Desktop
 
@@ -144,14 +145,14 @@ npm run install-desktop-config
 ```
 
 This merges a `personify` entry into
-`~/Library/Application Support/Claude/claude_desktop_config.json` (creating
-the file if it does not exist yet), whose command is the absolute path to
-this repo's `bin/personify-mcp` launcher, with no arguments. It only ever
+`~/Library/Application Support/Claude/claude_desktop_config.json`, creating
+the file if it does not exist yet. The entry's command is the absolute path
+to this repo's `bin/personify-mcp` launcher, with no arguments. It only ever
 touches the `personify` key under `mcpServers`; any other MCP servers or
-settings already in that file are left exactly as they are. Running it again
-(for example after moving the repo) safely updates the entry in place rather
-than duplicating it, and it replaces an older `node .../dist/index.js` entry
-with the launcher.
+settings already in that file are left exactly as they are. Running it again,
+for example after moving the repo, updates the entry in place rather than
+duplicating it, and it replaces an older `node .../dist/index.js` entry with
+the launcher.
 
 Fully quit and restart Desktop after the first install. Desktop reads this
 file only at launch. After that, a `git pull` needs only a Desktop restart;
@@ -294,8 +295,9 @@ writes no stamp for a skipped check, so a short input can never come back
 2. In a **fresh** Desktop chat (no prior priming about personify), ask
    Desktop to personify a substantive paragraph of at least 40 words,
    containing at least one em dash. Use a long, substantive input beyond
-   the floor where practical, since issue #50 reproduced on long-form
-   drafts and not on short ones.
+   the floor where practical, since
+   [personify tool leaks internal instruction preamble into its output](https://github.com/twistedmelonman/personify/issues/50)
+   reproduced on long-form drafts and not on short ones.
 3. Confirm the outcome matches one of these three shapes (see "What the
    tool returns" above):
    - **verified**: the reply is the edited text alone, with no em dash, no
