@@ -106,6 +106,8 @@ The check itself runs standalone too. Redirect the file into stdin rather than p
 python3 scripts/pangram_check.py < body.md
 ```
 
+Every result also writes a check record to `~/.config/personify/checks/<sha256>.json`, keyed the same way, and the review gate's `stage` step refuses to queue a file with no matching record. So the redirect decides not just what the stamp is keyed to, but whether the text can be staged at all.
+
 Exit codes: 0 pass, 2 AI, 3 mixed, 4 skipped (under the word floor), 5 unavailable.
 
 ## Voice guide
