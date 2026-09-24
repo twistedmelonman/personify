@@ -105,6 +105,9 @@ class TempConfig:
     def stamps(self):
         return pathlib.Path(self.directory.name) / "personify" / "stamps"
 
+    def checks(self):
+        return pathlib.Path(self.directory.name) / "personify" / "checks"
+
     def cleanup(self):
         self.directory.cleanup()
 
@@ -669,6 +672,114 @@ class HashIdentityTests(unittest.TestCase):
             raw, request=replayer, env=dict(self.config.env), sleep=no_sleep
         )
         self.assertEqual(stamps.stat().st_mode & 0o777, 0o700)
+
+
+class CheckRecordTests(unittest.TestCase):
+    """Every result leaves a record, so the review gate can prove the check ran.
+
+    The gate enforces that Pangram saw the text, not what it said, so a FAIL
+    and a SKIPPED leave a record exactly as a PASS does. An error leaves none:
+    nothing was learned about the text.
+    """
+
+    def setUp(self):
+        self.config = TempConfig()
+        self.addCleanup(self.config.cleanup)
+
+    def run_check(self, raw, responses, env=None):
+        environment = dict(self.config.env)
+        if env:
+            environment.update(env)
+        return pangram.check(
+            raw, request=Replayer(responses), env=environment, sleep=no_sleep
+        )
+
+    def read_record(self, report):
+        return json.loads(
+            pathlib.Path(report["record_path"]).read_text(encoding="utf-8")
+        )
+
+    def test_a_pass_writes_a_record(self):
+        raw = fixture_text("human_long").encode("utf-8")
+        _, report = self.run_check(raw, [fixture_json("human_long")])
+        record = self.read_record(report)
+        self.assertEqual(record["status"], "PASS")
+        self.assertEqual(record["verdict"], "Human")
+        self.assertEqual(record["sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(record["task_id"], report["task_id"])
+        self.assertEqual(record["word_count"], report["word_count"])
+        self.assertEqual(record["fraction_ai"], report["fraction_ai"])
+
+    def test_a_fail_writes_a_record_and_still_no_stamp(self):
+        raw = fixture_text("ai_short").encode("utf-8")
+        _, report = self.run_check(raw, [fixture_json("ai_short")])
+        record = self.read_record(report)
+        self.assertEqual(record["status"], "FAIL")
+        self.assertEqual(record["verdict"], "AI")
+        self.assertFalse(self.config.stamps().exists())
+
+    def test_a_mixed_verdict_records_as_fail_mixed(self):
+        raw = fixture_text("ai_short").encode("utf-8")
+        _, report = self.run_check(raw, [fixture_json("mixed_short")])
+        record = self.read_record(report)
+        self.assertEqual(record["status"], "FAIL")
+        self.assertEqual(record["verdict"], "Mixed")
+
+    def test_a_skip_writes_a_record_with_no_verdict(self):
+        raw = fixture_text("mixed_short").encode("utf-8")
+        code, report = self.run_check(raw, [fixture_json("human_long")])
+        self.assertEqual(code, pangram.EXIT_SKIPPED)
+        record = self.read_record(report)
+        self.assertEqual(record["status"], "SKIPPED")
+        self.assertIsNone(record["verdict"])
+        self.assertIsNone(record["task_id"])
+        self.assertEqual(record["word_count"], report["word_count"])
+        self.assertFalse(self.config.stamps().exists())
+
+    def test_an_error_writes_no_record(self):
+        raw = fixture_text("ai_short").encode("utf-8")
+        failing = Replayer(
+            [fixture_json("ai_short")],
+            post_error=pangram.TransportError("no credits", status=402),
+        )
+        with self.assertRaises(pangram.CheckError):
+            pangram.check(
+                raw, request=failing, env=dict(self.config.env), sleep=no_sleep
+            )
+        self.assertFalse(self.config.checks().exists())
+
+    def test_the_record_is_named_for_the_raw_hash(self):
+        # Trailing whitespace is part of the key. gate-review hashes the raw
+        # staged file, so a key over stripped text would never match.
+        raw = (fixture_text("ai_short") + "  \n\n").encode("utf-8")
+        _, report = self.run_check(raw, [fixture_json("ai_short")])
+        self.assertEqual(
+            pathlib.Path(report["record_path"]).name,
+            hashlib.sha256(raw).hexdigest() + ".json",
+        )
+
+    def test_records_are_private(self):
+        raw = fixture_text("ai_short").encode("utf-8")
+        _, report = self.run_check(raw, [fixture_json("ai_short")])
+        path = pathlib.Path(report["record_path"])
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_an_empty_xdg_config_home_falls_back_to_home(self):
+        with tempfile.TemporaryDirectory() as home:
+            with mock.patch.dict(os.environ, {"HOME": home}):
+                raw = fixture_text("mixed_short").encode("utf-8")
+                _, report = pangram.check(
+                    raw,
+                    request=Replayer([]),
+                    env={"XDG_CONFIG_HOME": ""},
+                    sleep=no_sleep,
+                )
+                self.assertTrue(
+                    report["record_path"].startswith(
+                        os.path.join(home, ".config", "personify", "checks")
+                    )
+                )
 
 
 class WindowMergeTests(unittest.TestCase):

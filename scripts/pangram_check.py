@@ -34,6 +34,9 @@ Exit codes:
     4  SKIPPED      under the 40-word floor; no verdict, no stamp
     5  UNAVAILABLE  no secret, transport failure, STAGE_FAILED, bad usage
 
+Every result (0, 2, 3, 4) also writes a check record to
+checks/<sha256>.json. An error before a verdict (5) writes none.
+
 Any unexpected exception also exits 5, so a caller that reads the exit code
 fails closed rather than mistaking a crash for a pass.
 """
@@ -641,6 +644,27 @@ def estimated_cost(model: str, words: int) -> float | None:
     return round(rate * words, 6)
 
 
+def _write_private_json(directory: Path, digest: str, payload: dict) -> Path:
+    """Write <directory>/<digest>.json at 0600 inside a 0700 directory.
+
+    Default umask would leave the file 0644 in a 0755 directory, where any
+    local process could overwrite it. The temp file is created with the narrow
+    mode rather than chmod'd afterwards, so the bytes are never on disk at a
+    wider mode even briefly. mkdir's `mode` argument is masked by umask and
+    does nothing to an existing directory, so the chmod runs explicitly.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    os.chmod(directory, 0o700)
+    path = directory / f"{digest}.json"
+    temporary = directory / f".{digest}.json.tmp"
+    body = json.dumps(payload, indent=2) + "\n"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(body)
+    os.replace(temporary, path)
+    return path
+
+
 def write_stamp(
     env: dict[str, str],
     digest: str,
@@ -655,26 +679,19 @@ def write_stamp(
 
     Stamps live under the personify config dir, never under
     ~/.claude/gate-review/, which hook-block-gate-dir-write.sh blocks.
-
-    A stamp is what a hook trusts to allow a publish, so it is written 0600 in
-    a 0700 directory. Default umask would leave it 0644 in a 0755 directory,
-    where any local process could overwrite one and manufacture a pass. The
-    temp file is created with the narrow mode rather than chmod'd afterwards,
-    so the bytes are never on disk at a wider mode even briefly. mkdir's `mode`
-    argument is masked by umask and does nothing to an existing directory, so
-    the chmod on the directory runs explicitly.
     """
-    directory = config_root(env) / "stamps"
-    directory.mkdir(parents=True, exist_ok=True)
-    os.chmod(directory, 0o700)
-    path = directory / f"{digest}.json"
-    temporary = directory / f".{digest}.json.tmp"
-    body = json.dumps(payload, indent=2) + "\n"
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(body)
-    os.replace(temporary, path)
-    return path
+    return _write_private_json(config_root(env) / "stamps", digest, payload)
+
+
+def write_check_record(env: dict[str, str], digest: str, record: dict) -> Path:
+    """Record that these exact bytes were checked, whatever the result.
+
+    The review gate's `stage` refuses a file with no record, so this is what
+    proves Pangram saw the text before a person was asked to approve it. It
+    proves the check ran, not that it passed: FAIL and SKIPPED are recorded
+    exactly as PASS is. Only a stamp authorizes anything on its own.
+    """
+    return _write_private_json(config_root(env) / "checks", digest, record)
 
 
 def check(
@@ -700,10 +717,24 @@ def check(
     submitted = strip_markup(decoded)
     words = word_count(submitted)
 
+    def record(status: str, **fields: Any) -> str:
+        entry = {
+            "sha256": digest,
+            "status": status,
+            "verdict": None,
+            "fraction_ai": None,
+            "word_count": words,
+            "task_id": None,
+            "model": None,
+            "timestamp": clock().replace(microsecond=0).isoformat(),
+        }
+        entry.update(fields)
+        return str(write_check_record(env, digest, entry))
+
     # The floor is checked before the key is resolved, so a short reply never
     # shells out to 1Password and a skip needs no credential at all.
     if words < WORD_FLOOR:
-        return EXIT_SKIPPED, {
+        report = {
             "status": "SKIPPED",
             "verdict": None,
             "sha256": digest,
@@ -713,6 +744,8 @@ def check(
                 "which the detector produces false passes. No verdict, no stamp."
             ),
         }
+        report["record_path"] = record("SKIPPED")
+        return EXIT_SKIPPED, report
 
     model = select_model(request, env, sleep)
     task_id, result = submit_and_poll(request, submitted, model, sleep)
@@ -736,6 +769,14 @@ def check(
         "fraction_human": result.get("fraction_human"),
         "flagged_spans": [] if verdict == "Human" else flagged_spans(result, submitted),
     }
+
+    report["record_path"] = record(
+        report["status"],
+        verdict=verdict,
+        fraction_ai=report["fraction_ai"],
+        task_id=task_id,
+        model=model,
+    )
 
     if verdict == "Human":
         stamp = {
